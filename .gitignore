@@ -1,0 +1,6 @@
+specification/*.aux
+specification/*.log
+specification/*.toc
+specification/*.pdf
+specification/*.out
+specification/*.synctex.gz
