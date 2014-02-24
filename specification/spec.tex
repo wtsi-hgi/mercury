@@ -1,0 +1,42 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{parskip}
+\setlength{\parindent}{15pt}
+\author{Nicholas Clarke}
+\title{Mercury specification}
+
+\newcounter{paracounter}
+\newcommand{\npar}{\par\noindent\refstepcounter{paracounter}\theparacounter.\space}
+\begin{document}
+\maketitle
+\begin{abstract}
+We present a specification for Mercury, a hypothetical pipeline system designed for use in human genetics workflows. Drawn from previous experience managing and running genetics pipelines, we identify a number of specific capabilities that would be desirable for the purpose of provenance tracking, repeatability and optimality of experiment workflows.
+\end{abstract}
+\tableofcontents
+\section{Introduction}
+\npar Within human genetics, there is a need to be able to design and execute specific workflows (pipelines) for genome analysis on a reliable, repeatable and efficient basis. At present, HGI runs a variety of pipelines for human genetics projects. These are run against a Linux cluster using Lustre-backed storage by the following two tools: 
+\begin{itemize}
+\item \href{https://github.com/VertebrateResequencing/vr-pipe}{VRPipe} runs as the \textit{orchestration} framework for current pipelines. It takes a description of the workflow (as a Perl script) and is responsible for tracking dependencies between jobs, submitting them to the executor and monitoring their progress.
+\item \href{http://www-03.ibm.com/systems/technicalcomputing/platformcomputing/products/lsf/}{LSF} runs as the executor, responsible for taking an individual job and executing it on some compute resource. LSF additionally has the ability to manage job dependencies, but these features are not currently in use at the Sanger.
+\end{itemize}
+\npar Whilst these tools work suitably well for the general usage pattern at the Sanger, they show a number of limitations which it would be desirable to work around. In particular, HGI is interested in the areas of \textbf{data provenance}, \textbf{experiment repeatability}, \textbf{experiment isolation}, \textbf{pipeline optimisation} and \textbf{pipeline security}, hereafter referred to as PRIOS.
+\npar Human Genetics has recently taken delivery of a new cluster (hgs4) intended primarily for pipeline usage. This presents us with the opportunity to re-evaluate our current toolset and practices and think about what we would really like in a pipeline execution system. This document presents a write-up of a series of meetings held on the topic, and is intended to serve as a specification for a potential future system embodying these desires.
+\npar This document should ideally present the requirements for such a future system, and serve equally well as a guideline for the design of a new system or as a standard to evaluate existing systems by. Inevitably, however, we shall fall into the trap of starting to design a new system rather than just specify it. Where possible, sections that veer into design or even implementation will be flagged as such; it is quite likely, however, that some will escape. The reader is asked to bear this in mind when applying this document.
+\section{Goals}
+\npar In the introduction, we introduced some high-level goals in which HGI has a particular interest. These are not requirements in their own right, being too high-level, but should give rise to requirements in the same way as other top-level goals such as 'the system must be usable'. In this section, we'll take a look at these goals, elaborating on and discussing them in order to provide context and motivation for the requirements introduced in the following sections.
+\subsection{Data Provenance}
+\npar Data provenance is fundamentally about being able to ask the question ``Where did this data come from?'' For a given set of data, we want to be able to identify which pipeline(s) it was created from, what steps were involved, where the initial data came from, how the jobs were distributed amongst machines and what was running on the machines at the time? As far as possible, we would like to be able to identify precisely what happened to cause the data to be generated as they were.
+\npar There are various justifications for this. Partially, it is about repeatability (as in the next section) - being able to identify how something came about makes it much easier to repeat it. Partially it is about data integrity - being certain that results were generated using the precise input data which you thought they were. Optimisation also calls for provenance data - once we understand how precisely data were generated, we know how expensive they are to recreate and how important it is to store them. And, in part, we want to be able to document the process for users' own purposes, so they can check what happened as part of an analysis run by HGI.
+\npar Implementing provenance tracking leads to a number of requirements. We need to keep track of pipelines both as designed (in general, without specific reference to data) and as executed (on which hosts, at what time). We need to ensure that external dependencies are explicitly captured (which in turn leads to the isolation goal), and isolated both in the planning stage (separating external I/O from internal - e.g. passing data between steps in a pipeline) and in the execution stage, preventing steps from unknowingly accessing external resources.
+\subsection{Experiment Repeatability}
+\npar Following on from provenance, we have the goal of making our pipelines repeatable. This goes a step further than provenance; rather than simply identifying where data comes from, we would like to be able to recreate it, in spite of potential changes to the underlying infrastructure. 
+\npar This gives rise to the ideas of encapsulation already implemented in Mercury capsules, wrapping up an environment suitable to run a step of the pipeline. Whilst capsules provide repeatability of individual steps, we are also forced to consider repeatability of the entire pipeline, which requires us to suitably abstract away from specific hardware or infrastructure constraints. This is one advantage to moving away from the current LSF-based approach, for example.
+\npar Also covered under repeatability is the requirement to rerun an experiment whilst changing a fixed number of factors, and tracking effects. For example, we might want to rerun an old pipeline using a new version of a particular piece of software to see whether it meaningfully alters the output. This same idea applies to rerunning a pipeline on new data.
+\subsection{Experiment Isolation}
+\npar 
+\end{document}

@@ -1,0 +1,6 @@
+[submodule "hgc-tools"]
+	path = hgc-tools
+	url = git@github.com:wtsi-hgi/hgc-tools.git
+[submodule "aura"]
+	path = aura
+	url = git@github.com:nc6/aura.git
