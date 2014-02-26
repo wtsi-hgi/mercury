@@ -3,15 +3,17 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{amssymb}
-\usepackage{hyperref}
+\usepackage[colorlinks]{hyperref}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{parskip}
+\usepackage[style=long,toc,xindy]{glossaries}
+\makeglossaries
 \setlength{\parindent}{15pt}
 \author{Nicholas Clarke}
 \title{Mercury specification}
-
 \newcounter{paracounter}
 \newcommand{\npar}{\par\noindent\refstepcounter{paracounter}\theparacounter.\space}
+\include{glossary}
 \begin{document}
 \maketitle
 \begin{abstract}
@@ -19,7 +21,7 @@ We present a specification for Mercury, a hypothetical pipeline system designed 
 \end{abstract}
 \tableofcontents
 \section{Introduction}
-\npar Within human genetics, there is a need to be able to design and execute specific workflows (pipelines) for genome analysis on a reliable, repeatable and efficient basis. At present, HGI runs a variety of pipelines for human genetics projects. These are run against a Linux cluster using Lustre-backed storage by the following two tools: 
+\npar Within human genetics, there is a need to be able to design and execute specific \glspl{workflow} (\glspl{pipeline}) for genome analysis on a reliable, repeatable and efficient basis. At present, HGI runs a variety of pipelines for human genetics projects. These are run against a Linux cluster using Lustre-backed storage by the following two tools: 
 \begin{itemize}
 \item \href{https://github.com/VertebrateResequencing/vr-pipe}{VRPipe} runs as the \textit{orchestration} framework for current pipelines. It takes a description of the workflow (as a Perl script) and is responsible for tracking dependencies between jobs, submitting them to the executor and monitoring their progress.
 \item \href{http://www-03.ibm.com/systems/technicalcomputing/platformcomputing/products/lsf/}{LSF} runs as the executor, responsible for taking an individual job and executing it on some compute resource. LSF additionally has the ability to manage job dependencies, but these features are not currently in use at the Sanger.
@@ -82,9 +84,13 @@ For cases such as splitting files and operating in parallel, but potentially oth
 \subsection{Other goals}
 \npar The PRIOS goals represent a specific area in which HGI is particularly interested in extending our pipeline systems. However, there are also a number of other goals which are intrinsic to the proposed system being useful and suitable as a general replacement for the current Mercury pipeline system. We address these in the following section.
 \subsubsection{Resilience}
-\npar Running over a large-scale cluster, errors with individual low probability become a regular occurrence, and we therefore require our system to deal with them accordingly. Resilience splits into 
+\npar Running over a large-scale cluster, errors with individual low probability become a regular occurrence, and we therefore require our system to deal with them accordingly. Further, leaving aside even the error case, the Mercury system will rely on a number of tools outside its control. In the initial conception, Mercury at the Sanger will be running on a number of private compute nodes as well as some shared with other uses, using two or three distinct Lustre storage units for scratch storage. Any of these units may be taken down for reasons outside of Mercury's (or HGI's) control, and Mercury must be able to cope with these outages.
+\npar Resilience starts with the ability to self-monitor; Mercury needs to be able to detect failures and handle them gracefully. These failures may occur in many different places: in an individual job, on a host, at the network level, in the job planner, with a specific resource (e.g. a particular Lustre unit), with external I/O, and so on. Each of these error modes may need to be handled differently. The system needs to be able to identify various classes of error, handle immediate consequences, perhaps investigate further, maintain an internal awareness of what is working and what is not, and report back to users, HGI or Systems.
+\npar The first responsibility upon detecting an error is to ensure the integrity of associated data. Where errors have been detected on a node, or with a particular resource, this may taint recent results which have been generated on that node or using that resource. The pipeline may need to decide to backtrack and rerun certain steps whose results are now suspect. A failing node will need to be closed to new jobs until the system (or a user) can verify it is working correctly. Where there are more transient errors, such as reading a file from disk and getting an invalid checksum, it may only be necessary to restart the step in question, though if such an error persists then the pipeline may need to backtrack.
+\npar After guaranteeing the integrity of working data following an error, the system should also attempt to continue running to the best of its ability with whatever capability it has remaining. If a pipeline depends on data which is no longer available, it should attempt to recreate that data in another location.
 \label{sec:resilience}
 \subsubsection{Flexibility}
 \subsubsection{Usability and accessibility}
 \subsubsection{Scalability}
+\printglossaries
 \end{document}

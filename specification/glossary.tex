@@ -1,0 +1,34 @@
+\newglossaryentry{pipeline}{
+name={pipeline},
+description={Representation of a particular series of actions to be executed against some input data in order to produce a desired output. Individual \glspl{step} in a pipeline may depend on other steps. A pipeline as a whole can be envisioned as a directed graph, usually without cycles}
+}
+
+\newglossaryentry{workflow}{
+name={workflow},
+description={See \gls{pipeline}}
+} 
+
+\newglossaryentry{step}{
+name={step},
+description={An individual `block' in a pipeline. It may be either a \gls{primitive step} or a \gls{composite step}}
+}
+
+\newglossaryentry{primitive step}{
+name={primitive step},
+description={An indivisible step - e.g. a step which does not contain substeps. A primitive step is suitable for passing to a \gls{job executor} for execution on a particular host}
+}
+
+\newglossaryentry{composite step}{
+name={composite step},
+description={A step made up of other steps. A composite step can be thought of as a \gls{pipeline} in its own right, included as part of a larger pipeline}
+}
+
+\newglossaryentry{job executor}{
+name={job executor},
+description={Takes an abstract description of some code to be run in the form of a \gls{primitive step} and executes it as a \gls{job} on a particular host}
+}
+
+\newglossaryentry{job}{
+name={job},
+description={A specific piece of code executing on a host}
+}
