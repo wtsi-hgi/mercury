@@ -93,8 +93,28 @@ For cases such as splitting files and operating in parallel, but potentially oth
 \label{sec:resilience}
 \subsubsection{Flexibility}
 \label{sec:flexibility}
-\npar E.g. in underlying resources, execution hosts etc.
+\npar The current pipelines used by HGI are somewhat specific to Sanger infrastructure, tied to LSF and Lustre and our current use of them. Whilst this is in no way a problem at present, we can envision wanting to replace these at some time in the future, or to hook other resources into the system and allow them to be used. We may also wish to run Mercury at places other than the Sanger which have quite different infrastructure.
+\npar We would therefore like to be generally flexible as to the required infrastructure supporting Mercury. Without going into too much detail, here are some ideas of things which we do and do not expect to rely on.
+\begin{itemize}
+\item Things we expect to rely on:
+\begin{enumerate}
+\item Linux - this is an implicit requirement of many of the tools we use, and there's almost no call for running on anything else.
+\end{enumerate}
+\item Things we may come to rely on:
+\begin{enumerate}
+\item LXC - this is currently our expected method for containerisation of jobs, and we don't think this will change. However, it's possible that the \glspl{job executor} could be made sovereign of the container mechanism used to actually run its jobs, subject to a sufficiently rich interface between the two. However, it's not clear that it's worth the cost of doing this.
+\item Mesos - or at least a similar meta-scheduler. This is not a necessary dependency, and the interface is very simple, which is why it seems fair to consider it. Mercury could operate directly against compute resources which it owns, but this would require it to implement much of Mesos's functionality whilst losing the benefit of running other schedulers under it.
+\end{enumerate}
+\item Things we would like not to rely on:
+\begin{enumerate}
+\item Storage mechanisms - current pipelines are reliant on traditional Posix-based file systems for their working storage. However, there are often better choices to be made for certain types of access pattern. For example, one way of abusing Lustre is to write millions of small files, which causes congestion on the metadata server. A key-value style store, however, is perfect for storing many small documents, so may well be a better choice for this access pattern. Where small amounts of data are being passed around between jobs, we may not want to go to the expense of writing to disk at all, and use something like a memcached server to persist data between jobs.
+
+Mercury will ideally be able to support multiple different backing storage mechanisms, and be able to choose between them according to the particular situation.
+\item Host software - by taking advantage of containerisation we aim to reduce the requirements on the individual host to being able to run a job executor and a container. This should eliminate problems with the software configuration on a host.
+\end{enumerate}
+\end{itemize}
 \subsubsection{Usability and accessibility}
+\npar TODO - this section has not yet been discussed!
 \subsubsection{Scalability}
 \npar As our demands for computation increase, it may be increasingly implausible to carry out all computation in house using pre-assigned resources. Whilst we assume that the hgs4 cluster may run Mercury constantly, we may also wish to use other resources such as the general clusters to expand Mercury on a temporary basis, either to cope with periods of increased demand, or to deal with particular jobs possessing unusual requirements.
 \npar Mercury needs to be built to cope with the idea of its fundamental resources - whether in the form of compute nodes or storage resources - being transitory, subject to expansion or removal even during pipeline execution. It should be easy to add a new resource for use by Mercury and have existing Pipelines seamlessly modified to take advantage of it. Likewise when a resource is removed from the system.
