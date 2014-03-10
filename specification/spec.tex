@@ -315,9 +315,7 @@ seq 1 1000000 | filterPrimes | head -n 5
 		  [<->] (hostAgent) -- (container.east |- hostAgent)
 		  [<->] (hostAgent) |- (xAgent)
 		  [<->] (xAgent) -- (heap.east |- xAgent)
-		  [<->] (container) -- (heap.east |- container)
-		  [->] (container) -- (mds)
-		  [->] (xAgent) -- (mds.south -| xAgent);
+		  [<->] (container) -- (heap.east |- container);
 \end{tikzpicture}
 \caption{A rough system diagram for the proposed Mercury system.}
 \label{fig:architecture}
@@ -354,12 +352,14 @@ In general, we do not see the pipeline catalogue as storing the definitive recor
 \npar The above list defines a minimal set of information needed to implement much of the above functionality. There are various other data which it might be useful for the metadata system to store - for example, a full log of everything done by the system.
 \npar The metadata system provides the majority of the checks and guarantees underlying the PRIOS capabilities of the system; as such, it must be highly resilient to outages, and deal with them in a predictable manner.
 \subsection{Host Agent}
-\npar The host agent is responsible for the following:
+\npar The host agent is the principal representation of Mercury on a task execution host. As such, it is responsible for the following:
 \begin{itemize}
 \item Establishing a Mercury presence on a host.
 \item Communicating with the system co-ordinator to establish system status.
 \item Taking descriptions of steps which have been scheduled on to that host, running up the relevant container, and passing the step description to the in-container execution agent.
-\item Mediating communication between the in-container execution agent and the system co-ordinator.
+\item Mediating communication between the in-container execution agent and the system co-ordinator and metadata server.
+\item Executing other commands from the system co-ordinator - for example, instructions to stop or suspend a job.
 \end{itemize}
+\npar Since the host agent has total delegated responsibility for everything which happens on a particular host, it should be resilient to problems either in itself or from the jobs which it is running.
 \printglossaries
 \end{document}
