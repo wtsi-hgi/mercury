@@ -9,7 +9,7 @@
 \usepackage{listings}
 \usepackage[style=long,toc,xindy]{glossaries}
 \usepackage{tikz}
-\usetikzlibrary{shapes,arrows,positioning}
+\usetikzlibrary{calc,shapes,arrows,positioning}
 \makeglossaries
 \setlength{\parindent}{15pt}
 \author{Nicholas Clarke}
@@ -203,6 +203,39 @@ seq 1 1000000 | filterPrimes | head -n 5
 \npar This objection could be worked around with judicious use of a resource constraints approach, where a job could be specified to require a certain network or similar. However, the second major objection to this behaviour is that it requires out-of-band communication between nodes, making it more difficult to ensure things such as data provenance and repeatability.
 \npar This is not to say that we do not see a place for such jobs; indeed, we believe that their importance is only going to grow. However, it may be that they are better handled by higher level frameworks such as Hadoop which gain more powerful semantics for reasoning about parallel jobs through the sacrifice of flexibility as to how a job operates. Our preferred scenario for the deployment of Mercury has it running atop of \href{http://mesos.apache.org/}{Mesos}, a meta-scheduler allowing resources to be shared between multiple scheduling frameworks. This would allow Mercury to run alongside Hadoop, servicing different type of jobs.
 \npar All of that having been said, it may be that there is still a desire to include MPI-type jobs into the purview of Mercury. This problem is unlikely to be insurmountable, but would require that we consider safe ways of constraining network communication, of passing \glspl{metadata} (e.g. host addresses) into jobs, and of generalised resource constraints which would allow, for example, a \gls{step} to specify that all jobs resulting from it must be deployed onto the same network segment.
+\subsection{Data reference transformations}
+\begin{figure}
+\begin{center}
+\tikzstyle{process} = [text width=6em, fill=blue!20, rounded corners, text centered, minimum height=1.25cm, minimum width=2cm]
+\tikzstyle{type} = [draw,circle,inner sep=1pt,fill]
+\begin{tikzpicture}
+	\node (A) [process] {A};
+	\node (A_o1) [type] [right=of A] {};
+	\draw [->] (A) -- node[above] {[s]} (A_o1);
+	\node (B)[process] [below=of A] {B};
+	\node (B_o1) [type] [right=of B] {};
+	\draw [->] (B) -- node[above] {[t]} (B_o1);
+	\node (C) [process,fill=green!20] [right=4 of $ (A) !.5! (B) $] {`zip'};
+	\node (C_i1) [type] [above left=-0.6 and 1 of C] {};
+	\node (C_i2) [type] [below left=-0.6 and 1 of C] {};
+	\node (C_o1) [type] [right=of C] {};
+	\draw [->] (C_i1) edge node[above] {[s]} (C_i1 -| C.west)
+		  (C_i2) edge node[below] {[t]} (C_i2 -| C.west)
+		  (C) edge node[above] {[(s,t)]} (C_o1);
+	\node (D) [process] [right=3 of C] {D};
+	\node (D_i1) [type] [left=of D] {};
+	\draw [->] (D_i1) edge node[above] {[(s,t)]} (D);
+	\draw [->,dashed,red] (A_o1) |- (C_i1)
+			(B_o1) |- (C_i2)
+			(C_o1) edge (D_i1);
+\end{tikzpicture}
+\end{center}
+\caption{Here, the outputs from A and B are merely paired in `zip', whilst no work is done on the relevant data.}
+\label{fig:referenceTransform}
+\end{figure}
+\npar Consider the pipeline fragment given in figure \ref{fig:referenceTransform}. Here, step `A' outputs an array (or list, or collection) of outputs of type $s$, whilst step `B' outputs an array of outputs of type $t$. Step `D' operates on pairs of items $(s,t)$. For example, steps `A' and `B' may output sequences of BAM and BAM index files respectively, and step `D' require paired BAMs and indexes to operate.
+\npar In order to pair these types, we add a further step into the middle. This step takes the two sequences $ \{s_i\} $ and $ \{t_i\} $ and outputs a new sequence of pairs $ \{(s_i, t_i)\} $. This is generally known as `zipping' the two sequences; we can also consider various other operations that work in such a way (such as taking the Cartesian product of the two sequences).
+\npar The important thing to notice about the `zip' step in the middle is that it does not actually do anything to the data - no file of type $s$ or $t$ needs to be read. Rather, it simply transforms the references to the data, pairing them up and passing them on. This is a fairly standard operation, but does require the more general referencing system rather than simply file references. This should also be supported by the step specification in terms of allowing steps to transform only references whilst never reading in any data.
 \section{External Interactions}
 \npar Covered under this heading are the various ways in which we wish Mercury to interact with other people and systems. This does not cover systems upon which Mercury itself relies (which can be seen as implementation details) but does cover the various ways in which other systems can expect to rely on Mercury.
 \npar This section will be divided in the following way: firstly, we shall cover the expected interactions with users, divided into the various roles we see interacting with the system. Secondly, we shall deal with the expected interactions with external systems.
@@ -299,9 +332,9 @@ seq 1 1000000 | filterPrimes | head -n 5
 	\node (res1) [above=of res0] [store] {Resource};
 	\node (res2) [below=of res0] [store] {Resource};
 	\draw [<->]
-		(res1) -- (heap)
-		(res0) -- (heap)
-		(res2) -- (heap) 
+		(res1) edge (heap)
+		(res0) edge (heap)
+		(res2) edge (heap) 
 		(heap) -| (sysco);
 	\node (container) [below=2cm of mds] [container] {
 		\begin{tikzpicture}
@@ -341,7 +374,7 @@ In general, we do not see the pipeline catalogue as storing the definitive recor
 \subsubsection{Step Catalogue}
 \npar Included here as a subset of the pipeline catalogue, the Step Catalogue should retain a list of all (primitive) steps out of which one can build pipelines. As with the pipeline catalogue, there should be facilities to register a step, to obtain a list of all steps in the system, and to get details on an individual step. If the step has an implicit concept of `version' then this should be recognised by the step catalogue; otherwise, the catalogue should attempt to present the concept of a version over the top of the discrete primitive steps (by, e.g., grouping samtools-* steps together).
 \subsection{Metadata System}
-\npar The metadata system is perhaps the core component of our envisioned Mercury. It holds the core register of everything that has been seen, done and output by the Mercury system. At a basic level, the metadata system is responsible for tracking:
+\npar The metadata system holds the core register of everything that has been seen, done and output by the Mercury system. At a basic level, the metadata system is responsible for tracking:
 \begin{itemize}
 \item A list of all pipelines (abstract, configured and executable) which have previously run within the system, as well as their connections.
 \item Each step (primitive, composite and parallel) which has run within the system.
@@ -360,6 +393,20 @@ In general, we do not see the pipeline catalogue as storing the definitive recor
 \item Mediating communication between the in-container execution agent and the system co-ordinator and metadata server.
 \item Executing other commands from the system co-ordinator - for example, instructions to stop or suspend a job.
 \end{itemize}
-\npar Since the host agent has total delegated responsibility for everything which happens on a particular host, it should be resilient to problems either in itself or from the jobs which it is running.
+\npar Since the host agent has total delegated responsibility for everything which happens on a particular host, it should be resilient to problems either in itself or from the jobs which it is running. Where the host agent dies, the host is removed from the wider system (although the co-ordinator may attempt to start another agent). 
+\npar Since the execution agent inside the container, and the container itself, have limited connectivity, most communications from the host to the wider system should be mediated through the host agent. The host agent should therefore be suitably scalable as to deal with multiple jobs running on the same host talking to it.
+\npar Since the host agent runs outside of a containerised environment, its role in actually executing the job should be minimal; the host agent is not responsible for running a step itself, but only for running up an execution agent within a suitable container.
+\subsection{Container}
+\npar The container provides the principal means of isolation and repeatability for a single job (as opposed to a pipeline, where repeatability is provided by the wider system guarantees).
+\npar The container provides the reproducible unit (e.g. the level of granularity at which things can be perfectly reproduced) for a given step. As such, the container must be persistent: immutable once created and stored for future usage. We would also like capsules to be minimal, such as to reduce the number of dependencies and sources for potential errors. However, this is not a requirement; we might have larger containers which can execute multiple steps.
+\npar A container is required to provide every requirement for executing one (or more) steps. For example, if a step describing an invocation of samtools-0.1.0 uses the container $ A $, then $ A $ is required to make available that specific version of samtools. It is also responsible for presenting any input data to the step running inside; the container should provide part of the implementation of the abstraction layer existing over the disparate resources. For example, resources stored in arbitrary places within the Mercury heap should be mounted into specific locations inside the container, such that the heap abstraction is obscured.
+\npar The container must also supply the execution agent (see \ref{sec:executionAgent}), which serves to interpret the step specification and maintain communication with the host agent about its status. Since the execution agent may perform non-trivial computation (in some cases, where the step specification itself describes the full computation, the entire step may be run within the execution agent), a specific version of the execution agent must be considered part of the container itself. This way, new versions of the execution agent may be created without breaking or altering the execution of previous pipelines.
+\npar Containers should provide some means for debugging the processes which are going on inside them. In our initial conception, which uses LXC as a container, an obvious route would be a flag that will run an SSH server inside the container, allowing somebody external to step inside the container and debug.
+\subsection{Execution agent}
+\label{sec:executionAgent}
+\npar The execution agent is the second of two agents which run on the execution host. Unlike the host agent, which runs outside of the container, the execution agent runs inside a container and is responsible for interpreting, and running, a step.
+\npar Since the execution agent runs inside the container, it is allowed to have significant impact on the running of the job itself. Indeed, from the perspective of Mercury, the interpretation of the step specification by the execution agent \textit{is} the job. In some cases, the step specification may fully describe all processing which needs to take place on the input data. In others, it may simply be a wrapper around an existing program which it rapidly invokes. In the expected case, the execution agent would perform a number of acts such as verifying input data or transforming particular formats, and then `exec' an existing program to perform the majority of the computation.
+\npar The execution agent should keep hold of the file and process handles for any `exec'-ed processes it invokes, and (with reference to the step specification) use these to update the host agent (and through that, the system co-ordinator and metadata system) as to the job's status. For example, if a program emits a progress bar on stdout, the execution agent could parse this and use it to report on job progress. The execution agent should be able to distinguish success and failure exits from any invoked processes.
+\npar The execution agent, as opposed to the host agent, is responsible only for a single job, and its failure should be assumed; where an execution agent fails, this should be caught by the host and potentially restarted (on the same or another host).
 \printglossaries
 \end{document}
