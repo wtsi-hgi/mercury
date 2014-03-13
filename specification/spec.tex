@@ -435,6 +435,16 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \npar Included here as a subset of the pipeline catalogue, the Step Catalogue should retain a list of all (primitive) steps out of which one can build pipelines. As with the pipeline catalogue, there should be facilities to register a step, to obtain a list of all steps in the system, and to get details on an individual step. If the step has an implicit concept of `version' then this should be recognised by the step catalogue; otherwise, the catalogue should attempt to present the concept of a version over the top of the discrete primitive steps (by, e.g., grouping samtools-* steps together).
 \subsection{System Co-ordinator}
 \npar The system co-ordinator is responsible for overseeing and tracking the interaction of other components and the current system state. Where the metadata system (\ref{sec:metadataSystem}) is the long-term memory of the system, the system co-ordinator is the short-term memory and central nervous system.
+\npar The system co-ordinator has the following responsibilities:
+\begin{itemize}
+\item Keeping track of all hosts available to the system.
+\item Keeping track of all steps currently running through the system, their progress and status.
+\item Keeping track of all resource usage over the system.
+\item Recording completed jobs in the metadata store.
+\item Restarting any failed host agents.
+\item Facilitating conversation between different parts of the system.
+\end{itemize}
+\npar Whilst the metadata system must be resilient to damage since it holds the canonical record of all previously run jobs, it should be assumed that if the system co-ordinator crashes, the only things that should fail should be currently executing jobs or pipelines. Any `complete' data which will continue to be useful to the system should be recorded in the metadata system. The system co-ordinator should still be resilient to breakage, since an outage would render it impossible to run jobs, but it should be valid to start a completely new system co-ordinator against an old metadata system and have the system come up correctly.
 \subsection{Metadata System}
 \label{sec:metadataSystem}
 \npar The metadata system holds the core register of everything that has been seen, done and output by the Mercury system. At a basic level, the metadata system is responsible for tracking:
