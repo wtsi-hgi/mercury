@@ -485,5 +485,26 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \npar Whilst we talk here about a single execution agent, we envision that there may be multiple execution agents supporting different programming environments. For example, a simple execution agent might interpret a bash script as a job, but we may also have execution agents that allow steps to be written in other programming languages such as Java, Haskell or Python. The important thing is that the execution agent have defined semantics for talking to the host agent and heap manager. Since step specifications require a particular execution agent, part of the step specification can be specific to that execution agent - for example, it may be a program in the given language.
 \subsection{Step Specification}
 \label{sec:stepSpec}
+\npar The step specification is the embodiment of a task that can be run on a given computer within the Mercury system. More formally, we shall say that the step specification is a program to be interpreted by an execution agent, along with a technical description of various of its properties.
+\npar The step specification must provide descriptions of the following:
+\begin{itemize}
+\item The step name.
+\item The container which this step should run in.
+\item The execution agent responsible for executing this step.
+\item The number, type and label of all inputs to the step.
+\item The number, type and label of all outputs to the step.
+\end{itemize}
+\npar The program (or its interpretation by the execution agent, depending on semantics) must also supply the following:
+\begin{itemize}
+\item A means of supplying the inputs.
+\item A means of obtaining (or redirecting) the outputs.
+\item Handles on stdout and stderr.
+\item A means of determining the exit status of the step upon completion.
+\end{itemize}
+\npar It may also potentially provide:
+\begin{itemize}
+\item A means of ascertaining the progress of this particular step.
+\end{itemize}
+\npar As mentioned, the program part of the step specification could potentially be written in multiple languages, provided there exists a suitable execution agent capable of interpreting the specification. The step id is likely to be generated as some kind of checksum of the above information, since this provides a guarantee that the step cannot be modified without changing the id.
 \printglossaries
 \end{document}
