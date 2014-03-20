@@ -8,6 +8,7 @@
 \usepackage{parskip}
 \usepackage{listings}
 \usepackage[style=long,toc,xindy]{glossaries}
+\usepackage[toc,page]{appendix}
 \usepackage{tikz}
 \usetikzlibrary{calc,shapes,arrows,positioning}
 \makeglossaries
@@ -69,7 +70,7 @@ We present a specification for Mercury, a hypothetical pipeline system designed 
 \subsection{PRIOS Goals}
 \subsubsection{Data Provenance}
 \label{sec:provenance}
-\npar Data provenance is fundamentally about being able to ask the question ``Where did this data come from?'' For a given set of data, we want to be able to identify which pipeline(s) it was created from, what steps were involved, where the initial data came from, how the jobs were distributed amongst machines and what was running on the machines at the time? As far as possible, we would like to be able to identify precisely what happened to cause the data to be generated as they were.
+\npar Data provenance is fundamentally about being able to ask the question ``Where did these data come from?'' For a given set of data, we want to be able to identify which pipeline(s) it was created from, what steps were involved, where the initial data came from, how the jobs were distributed amongst machines and what was running on the machines at the time? As far as possible, we would like to be able to identify precisely what happened to cause the data to be generated as they were.
 \npar There are various justifications for this. Partially, it is about repeatability (as in the next section) - being able to identify how something came about makes it much easier to repeat it. Partially it is about data integrity - being certain that results were generated using the precise input data which you thought they were. Optimisation also calls for provenance data - once we understand how precisely data were generated, we know how expensive they are to recreate and how important it is to store them. And, in part, we want to be able to document the process for users' own purposes, so they can check what happened as part of an analysis run by HGI.
 \npar Implementing provenance tracking leads to a number of requirements. We need to keep track of pipelines both as designed (in general, without specific reference to data) and as executed (on which hosts, at what time). We need to ensure that external dependencies are explicitly captured (which in turn leads to the isolation goal), and isolated both in the planning stage (separating external I/O from internal - e.g. passing data between steps in a pipeline) and in the execution stage, preventing steps from unknowingly accessing external resources.
 \npar Provenance tracking becomes slightly more tricky with the inclusion of optimisations that enable reuse of results (see section \ref{sec:optimisation}). This is because the same data may be generated in multiple ways by multiple people, or, in some cases, may be used in one experiment having been generated in an entirely different way by another (but where we have evidence that the results will be identical - perhaps through carrying out a third experiment). At a tracking level, this problem is not difficult - we should, as a matter of course, track \textit{every} time data is generated or recovered from a cache, with an indication of which pipeline and pipeline components generated it and whether it was actually generated or cache-recovered. When presenting these data to users, however, thought must be given to how to deduce the \textit{correct} provenance for any particular enquiry from the context of the question.
@@ -91,7 +92,7 @@ We present a specification for Mercury, a hypothetical pipeline system designed 
 \item Separately, but relatedly, we would like to support demand-based pricing of the various resources available to the system (CPU, Memory, I/O etc) and a `fairshare' like system built around this pricing model. At the user-facing level, this would hopefully address some of the problems with the current system in terms of `cheap' resources being underutilised - where there is low demand on a particular resource, the price would drop until demand rose.
 
 At the system level, this model would give us the additional information needed to engage in deliberate currency trading between storage and compute, providing another method to increase efficiency. For example, if we found ourselves with CPU resources in very high demand but a surfeit of disk space, we might choose to `buy' CPU resource by aggressively caching data, lowering the cost of compute at the expense of cost for disk space.\footnote{One can imagine a scenario where we might attempt to do similarly for resources such as CPU and memory by literally trading with other clusters - perhaps offering cheap pricing for CPU-intensive low-memory jobs in return for cheap access to lots of memory. One can imagine this, but we shall discuss it no further in this paper.}
-\item Once we are in possession of the mechanisms for evaluating the costs of TMTOs and similar techniques, we would like an infrastructure capable of taking advantage of this as much as possible. To do this it is necessary to identify where multiple pipelines share components and aggressively de-duplicate processing. This should occur both with concurrent pipelines (where shared steps are 'merged') and with pipelines which repeat work previously done by another pipeline. As mentioned in section \ref{sec:provenance} on provenance, this must be done both on pipelines `as designed', where we de-duplicate steps which are conceptually the same, and `as executed', where we de-duplicate steps which are executed in the same way.
+\item Once we are in possession of the mechanisms for evaluating the costs of TMTOs and similar techniques, we would like an infrastructure capable of taking advantage of this as much as possible. To do this it is necessary to identify where multiple pipelines share components and aggressively de-duplicate processing. This should occur both with concurrent pipelines (where shared steps are 'merged') and with pipelines which repeat work previously done by another pipeline. As mentioned in section \ref{sec:provenance} on provenance, this must be done both on abstract pipelines, where we de-duplicate steps which are conceptually the same, and on executable pipelines, where we de-duplicate steps which are executed in the same way.
 
 As an example of this last point, we consider three related pipelines which calculate summary statistics on a list of numbers. They can be described as follows:
 \begin{enumerate}
@@ -110,7 +111,7 @@ Furthermore, since we do not just care about the fastest execution, but about th
 For cases such as splitting files and operating in parallel, but potentially other parameters, we would like the system to be able to choose a value for the parameter to take advantage of its knowledge of current resource prices and empirical data on the execution parameters of that job. This shifting of responsibility from the user to the system should allow for a more efficient execution, but also removes some of the control from the user in terms of their specific goals. For example, they might not wish to minimise cost but just get the fastest execution regardless of price. To cover this situation, we suggest that the system might implement different strategies for choosing parameter values. The default strategy might be to minimise cost, but another could attempt to minimise runtime, or minimise runtime subject to a cap on cost.
 \item Finally, we wish to be able to estimate the resource requirements for a given job in order to avoid under-allocation (resulting in the job failing and needing to run again) or over-allocation (where more resources are committed than are used). Both of these situations result in wasting resources which could be better used elsewhere.
 
-Resource estimates for a job should be based on learned data about previous invocations of jobs involving the same (or similar) steps and/or data. For example, we might start by estimating the mean of the resources used (rather than allocated) by all previous invocations of the same step. Ultimately, we expect this to become a machine learning problem using previous examples as our training points. It is perhaps relevant to note that we should not explicitly be trying to estimate the precise resource requirements, but the resource allocation which minimised the posterior expected loss in terms of resources - so we may deliberately overestimate requirements for jobs where there is a heavy cost to restarting. This also allows us to take the `price' of a resource (as mentioned above) into consideration in our estimation function.
+Resource estimates for a job should be based on learned data about previous invocations of jobs involving the same (or similar) steps and/or data. For example, we might start by estimating the mean of the resources used (rather than allocated) by all previous invocations of the same step. Ultimately, we expect this to become a machine learning problem using previous examples as our training points. It is perhaps relevant to note that we should not explicitly be trying to estimate the precise resource requirements, but the resource allocation which minimises the posterior expected loss in terms of resources - so we may deliberately overestimate requirements for jobs where there is a heavy cost to restarting. This also allows us to take the `price' of a resource (as mentioned above) into consideration in our estimation function.
 
 Where we have a new step, or a step operating for the first time, we may not have any previous knowledge to work from in estimating requirements. In this situation, the system would need to have a means to explore the space to get some initial estimates. Given we expect resources to be Pareto-distributed, a strategy of doubling the allocated resources until the program correctly runs makes a lot of sense.
 
@@ -167,9 +168,9 @@ Mercury will ideally be able to support multiple different backing storage mecha
 \npar Mercury should, on the whole, aim to simplify the process of designing and running safe, sensible and composable pipelines.
 \npar In the first part, this means that it should aim to provide good interfaces to support the design and running of pipelines. The interfaces should be easy to use (for an interested, engaged user) and should attempt to reduce the barrier to adding or running new pipelines in the Mercury system. We should aim for both adding and running pipelines to be accessible to software developers and bioinformaticians outside of HGI.
 \npar The most likely way of doing this involves the system providing a graphical interface to allow pipelines to be assembled from existing steps and pipelines, as well as to configure a pipeline (binding free variables), submit it into the system, and subsequently monitor it. However, we should also provide an API to allow other programs to tie into the system and allow experienced users to, for example, write a script to watch for the completion of their pipeline.
-\npar The second aspect to this centres around the idea of 'safe and sensible' pipelines. The system should, so far as possible, attempt to minimise the possibility of a user constructing a pipeline which is accepted as valid by the system but which can never succeed in running. To do this, the system needs to reduce the class of valid pipelines which can be submitted into the system.
+\npar The second aspect to this revolves around the idea of 'safe and sensible' pipelines. The system should, so far as possible, attempt to minimise the possibility of a user constructing a pipeline which is accepted as valid by the system but which can never succeed in running. To do this, the system needs to reduce the class of valid pipelines which can be submitted into the system.
 \npar The most obvious way to do this is through the use of a suitably powerful type system. Thus each input and output to a step could be assigned a specific type (e.g. `BAM file'), and it would only ever be valid to connect an output of type `a' to an input of type `a'. This would eliminate a large class of potential errors which consist of trying to connect two parts of a pipeline which operate on different types of data. Such as system could also help from other usability points of view - for example, suggesting possible steps (or pipelines) which are capable of converting from type a to type b.
-\npar The precise details of such a system remain an implementation detail - for example, the existence of a subtyping relation, universal and existential quantification, value-dependent typing etc. 
+\npar The type system would need to be sufficiently flexible to handle things such as multiple different types of BAM files. It could also potentially support types such as `BAM file with at least 30 records'. Precisely how to implement such things - using a subtyping relation, value-dependent typing etc - remains an implementation detail. 
 \subsection{Miscellany}
 \npar From our experience in dealing with existing requirements have come about a number of use cases which do not fit neatly into the high-level goals set out above, but which nonetheless represent concerns we should take into consideration when designing our system. We expect that these cases may be considered as extensions to the system rather than critical parts of the core system. However, the ability to admit such extensions must be seen as a goal for the system itself.
 \subsubsection{Checkpointing and Migration}
@@ -184,13 +185,13 @@ Mercury will ideally be able to support multiple different backing storage mecha
 \npar This observation lies at the heart of much of the optimisation strategy detailed above in section \ref{sec:optimisation}. However, it is in many ways a blunt instrument, with only two possibilities. Sometimes we would like to be more general. For example, we might wish to state that a particular output of a step depends on one of its inputs, but not the other. Alternatively, we might get a new version of a piece of software which we wish to use for performance reasons, but where we believe that the results should not differ from the previous version. In this case, we might assert that any results generated by the previous version can be used for pipelines running the new version, and vice versa.
 \npar We call such things generalised assertions. Generalised assertions are principally of use to the pipeline planning system - they determine where it should look to determine whether or not a step of a pipeline needs to run.
 \subsubsection{Quickcheck-style self testing}
-\npar In the previous section, we discussed the purity and how we could use this for pipeline optimisations. However, because we have actually worked with some of the software these pipelines will be running, we are a little sceptical of claims made by particular programs to being pure. As such, we would like Mercury to follow a `trust and verify' scheme. In general, we will assume that they do what they say, and will always return the same output for the same input. Sometimes, however, particularly when resources are very cheap owing to low utilisation, the system may decide to rerun supposedly pure components in order to verify that they are doing what they claim to do.
+\npar In the previous section, we discussed purity and how we could use this for pipeline optimisations. However, because we have actually worked with some of the software these pipelines will be running, we are a little sceptical of claims made by particular programs to being pure. As such, we would like Mercury to follow a `trust and verify' scheme. In general, we will assume that they do what they say, and will always return the same output for the same input. Sometimes, however, particularly when resources are very cheap owing to low utilisation, the system may decide to rerun supposedly pure components in order to verify that they are doing what they claim to do.
 \npar We may wish to do the same thing for any of the generalised assertions mentioned in the previous section. On occasion, we might want to go the other way - rather than trust and verify, we would distrust until we had enough confidence in the result, and only then assert such behaviour. This seems particularly likely in cases where a particular version of software is updated - we may not wish to trust anything without checking it first.
 \npar Mercury should ideally allow for support of both styles of property testing in a nice way, using previously run experiments as the source of data to test the system with.
 \subsubsection{Outage planner}
 \label{sec:outagePlanner}
 \npar In contrast to errors, we often know well in advance when outages for critical resources are going to occur. Given this, we should be able to take advantage of this foreknowledge in order to better make use of resources in and around the outage.
-\npar For example, on receiving knowledge that a storage system is going down, we might identify resources which are going to be needed by queued pipelines and begin moving them to another resource in advance of the outage. Meanwhile, very short or cheap jobs could be moved to using the soon to be outed resource in the knowledge that they will either finish before the outage or be cheap enough to replicate if taken down by it.
+\npar For example, on receiving knowledge that a storage system is going down, we might identify data which are going to be needed by queued pipelines and begin moving them to another resource in advance of the outage. Meanwhile, very short or cheap jobs could be moved to using the soon to be outed resource in the knowledge that they will either finish before the outage or be cheap enough to replicate if taken down by it.
 \npar Ideally, one would be able to tell Mercury about the outage schedule of particular resources and have this information used when deciding how to assign resources to particular pipelines or jobs.
 \subsubsection{Streaming}
 \npar In order to execute a pipeline, Mercury will need to perform a partial linearisation of the dependency graph - in other words, forcing jobs that serve as dependencies for others to be performed first. This will not form a total order, since some jobs may be independent of each other and may run simultaneously. In general, within each ordered chain, jobs will be executed sequentially, with one job running, outputting, and exiting before the next is allowed to start. This is a sensible strategy to assume for programs which, say, write their output to a file which another program will attempt to perform random accesses into.
@@ -328,21 +329,26 @@ seq 1 1000000 | filterPrimes | head -n 5
 	\draw [<->] (stepCatalogue) edge (pipelineCatalogue);
 	\node (pipelineQ) [below right=1cm of pipelineCatalogue] [process] {Pipeline Pool};
 	\node (pipelineX) [right=0.5cm of pipelineQ] [process] {Pipeline Compiler};
-	\node (jobQ) [right=0.5cm of pipelineX] [process] {Job Pool};
+	\node (bundleQ) [right=0.5cm of pipelineX] [process] {Bundle Pool};
+	\node (bundleX) [right=0.5cm of bundleQ] [process] {Bundle Selector};
+	\node (jobQ) [below =0.5cm of bundleQ] [process] {Package Pool};
 	\node (jobX) [right=0.5cm of jobQ] [process] {Job Scheduler};
 	\draw [->] (pipelineCatalogue) |- (pipelineQ)
-		       (pipelineCatalogue) -| (pipelineX)
-			   (stepCatalogue) -| (jobQ)		       
+		       (pipelineCatalogue) -| (pipelineX)     
     		       (pipelineQ) edge (pipelineX)
-		  	   (pipelineX) edge (jobQ)
+		  	   (pipelineX) edge (bundleQ)
+		  	   (bundleQ) edge (bundleX)
+		  	   (bundleX) -| ($ (bundleX)!0.5!(jobX) + (1.5,0)$) 
+		  	   			-- ($ (bundleQ)!0.5!(jobQ) + (-1.5,0) $)
+		  	   			|- (jobQ)
 		  	   (jobQ) edge (jobX);
 	\begin{pgfonlayer}{background}
 		\node (a) [above left=0.5cm of pipelineQ] {};
-		\node (b) [below right=1cm and 0.5cm of jobX] {};
+		\node (b) [below right=0.5cm and 0.5cm of jobX] {};
 		\path [fill=yellow!20,rounded corners,draw=black!50,dashed] (a) rectangle coordinate[midway](c) (b);
-		\node (pipelineLabel) [below=0.75cm of c] {Main Queue};
+		\node (pipelineLabel) [below left=0.5cm and 2cm of c] {Main Queue};
 	\end{pgfonlayer}
-	\node (d) [below=3cm of c] {};
+	\node (d) [below=4cm of c] {};
 	\node (mds) [left=0.5cm of d] [store,minimum width=3cm, minimum height=1.5cm, draw] {Metadata System};
 	\node (sysco) [right=0.5cm of d] [fill=green!20, rounded corners,minimum width=3cm, minimum height=1.5cm, draw] {System Co-ordinator};
 	\draw [<->] (c |- b) |- (mds);
@@ -376,47 +382,31 @@ seq 1 1000000 | filterPrimes | head -n 5
 \subsection{Main Queue}
 \npar The `main queue' is a loose term covering the part of the system which takes in a \gls{configured pipeline} and results in a sequence of jobs assigned to specific machines. In figure \ref{fig:architecture} and in the following sections, we have divided this into four main responsibilities. These responsibilities are even less cleanly divided than the other components mentioned in this section; they may split this way, or they may all be part of a single integrated component, or split some other way.
 \subsubsection{Pipeline Pool}
-\npar The pipeline pool is the entry point for a configured pipeline into the system. The pipeline pool keeps track of all pipelines which have been submitted into the system and have not completed, been cancelled, or otherwise been removed from the pool. This includes pipelines which are simply queued and have had no action taken, pipelines which have been compiled and have steps in the job queue, and pipelines with jobs currently running.
+\npar The pipeline pool is the entry point for a configured pipeline into the system. The pipeline pool keeps track of all pipelines which have been submitted into the system and have not completed, been cancelled, or otherwise been removed from the pool. This includes pipelines which are simply queued and have had no action taken, pipelines which have been compiled and have steps in the package pool, and pipelines with jobs currently running.
 \npar The pipeline pool \textit{may} choose to implement some sort of prioritisation system governing which pipelines go forward to the pipeline compiler. In many cases, where the number of pipelines is small, it may be likely that all pooled pipelines are submitted to the compiler for partial compilation.
 \npar The pipeline pool should provide an interface for querying the status information of pooled pipelines, as well as carrying out actions such as cancelling or pausing them. 
 \subsubsection{Pipeline Compiler}
-\npar The pipeline compiler is responsible for taking a \gls{configured pipeline} and compiling it into an \gls{executable pipeline}. This is a relatively complex operation, which we will describe in steps.
-\npar Firstly, we mark all input nodes in the graph (e.g. nodes which have no inputs connected to the output of another node).
-\paragraph{Forward pass}
-The forward pass goes forward through the graph, and attempts to work out where we can use the results of previous pipelines to short-cut the computation.
-\begin{enumerate}
-\item Starting from all marked nodes, walk forward through the graph (exploring all branches). 
-\item At each node, look up in the pipeline catalogue and determine any assertions matching the step and inputs. This gives a series of `alternate' steps and inputs.
-\item In the metadata system, look to see whether there exists a record matching the inputs and step id, or any alternate. 
-\item If there is, proceed to the next step(s), using the output ids from the metadata catalogue as the relevant inputs to the next step. If there is not, mark the current node and cease exploring this branch.
-\item Return the set of marked nodes, with their corresponding input ids.
-\end{enumerate}
-\paragraph{Backward pass}
-The backward pass now works backwards from the points identified in the forward pass, and tries to determine which data we still have stored.
-\begin{enumerate}
-\item Start with the set of nodes identified in the forward pass, and walk backwards through the graph (exploring all branches).
-\item At each node, look up in the metadata system and heap manager whether the identified inputs still exist in the heap, or have been previously output from the system to a persistent location.
-\item If so, mark the current node and cease exploring this branch. We also at this point inform the heap manager that this resource is now referenced by a running pipeline and is therefore ineligible for garbage collection. If not, walk backwards.
-\item Return the set of marked nodes, with their corresponding input ids.
-\end{enumerate}
-\paragraph{Expansion of composite nodes} At the end of the backward pass, we have our first set of potential steps to execute. These are still potentially composite or parallel steps, so the next thing we do is to expand any of the marked steps which are composite steps. We now mark the input steps to these composite steps, as well as the input ids (gathered from the composite steps).
-
-\npar At this point, we go back to the forward pass and repeat, except that this time we start from the set of marked steps identified in the expansion phase. This serves to apply the same potential shortcuts, but now operating on a set of steps one level `lower'. We continue this process until all of the marked steps are non-composite (e.g. primitive or parallel).
-\paragraph{Expansion of parallel nodes} We now attempt expansion of any parallel nodes. At this point, we look up current system utilisation from the system co-ordinator, expected resource profiles from the metadata system, and any hints from the pipeline catalogue, and pick a suitable parallelisation parameter. This lets us expand the parallel nodes into some number of new steps. We mark the input steps, as well as their input ids.
-
-\npar Again, we go back to the start and run through from the forward pass again, this time starting from the nodes we have identified in the previous step. This applies the shortcut logic on the individual pieces which are now to be operated on in parallel. We repeat this process until all of the marked steps are primitive steps.
-
-\npar We now have, in our marked steps, a set of primitive steps whose inputs we have available in the system. Note that these steps are the `heads' of chains of steps leading further into the pipeline, but we effectively discard the rest of the chain (and the rest of the chain certainly has not been fully compiled). These steps go forward as putative steps into the job pool.
-
-\npar The fact that the pipeline compiler has generated a putative set of steps to pass to the job pool does not mean that its work is now done. Various things may change between the finishing of the first compilation process and the jobs being scheduled that may call for recompilation. In particular, since the expansion of parallel steps phase is dependent on system conditions, the compiler may choose at any time to begin recompilation from the parallel expansion step to see whether a different set of jobs is generated. Assuming that no step corresponding to the same parallel step has been scheduled, the compiler may then choose to wholesale replace the previous set of jobs associated with that parallel step with the new set.
-
-\npar Throughout this section we have talked about a single pipeline executor, as if a single pipeline goes through this process at a time. In fact, we would expect multiple (potentially all) pipelines to be going through compilation at any given time, all proposing a set of candidate steps for execution to the job pool.
-
-\npar Once a step has been successfully run to completion as a job, that step should be marked as finished in the pipeline, and any downstream branches should again be recompiled, taking the output from the finished step as input into subsequent steps. This will then generate the next set of potential jobs to forward to the job pool. In this way, we only ever partially compile the `head' of a given pipeline at a time.
-\subsubsection{Job Pool}
-\npar The job pool holds all the steps which have been generated by the pipeline compilers, and which have not yet been scheduled to run by the job scheduler. The job pool is similar to the job queue in more traditional schedulers. We do not call it such since it does not really behave as a queue - as mentioned, we expect jobs to be removed from it before scheduling if the compiler changes its mind about how it wants to divide the jobs, and there is certainly no idea that the first thing to be scheduled is the first to run.
+\label{sec:pipelineCompiler}
+\npar The pipeline compiler is responsible for taking a \gls{configured pipeline} and compiling it into an \gls{executable pipeline}.
+\npar The last paragraph provides a sensible mental model for the behaviour of the pipeline compiler. However, it is entirely incorrect. Whilst we \textit{could} directly compile a configured pipeline into an executable pipeline, this would almost always be the wrong thing to do. Crucially, the pipeline compiler should use context to inform the decisions it makes in compilation, and that context may (indeed, will) change during the pipeline execution. A model where we try to compile everything up-front would inevitably miss out on various of the optimisations which we wish to employ in this area.
+\npar We shall now give a more accurate suggestion of pipeline compiler behaviour: the pipeline compiler takes a \gls{configured pipeline} and some state (representing the current state of the pipeline), and returns a set of \textit{package bundles}. Each bundle represents the various ways of performing one of the next steps in the pipeline, consisting as it does of \textit{packages}. Each package consists of a set of \glspl{primitive step}, a \textit{resource demand} and a \textit{continuation state}.
+\npar Let's start by examining a package. A package represents one way of running part of the pipeline - or, more specifically, a specific decomposition of a composite or parallel step in the configured pipeline into primitive steps. The principal component of a package is the set of primitive steps which will be eligible to run should the package be selected. Associated with this is a \textit{resource demand}, which encodes the resources needed to run the pipeline in this way. The resource demand should include both the `sticker price' - e.g. the resources which will be requested to run the steps included in the package - and the `TCO' - an estimate for the ultimate resource requirement of the entire pipeline should this package be selected. Note that resources here include the time taken for the step/pipeline to run. The final component of a package is the \textit{continuation state}. This provides extra information to the compiler in terms of what to do to continue processing when one of the jobs encoded in this package finishes.
+\npar A \textit{package bundle} contains multiple packages - e.g. multiple ways of potentially running one step of a pipeline. A pipeline compiler may choose to offer one or more packages in each bundle; obvious choices might be a `fast' package, a `cheap' package and a `compromise' package, but these options are not required. The pipeline compiler may choose to evaluate a cost of each package based upon its current knowledge of resource utilisation, but these are not guaranteed to reflect the actual cost of executing that package (since prices may have changed).
+\npar Each package bundle is submitted to the bundle pool for consideration. Since there may be multiple independent parts of a pipeline which may be executed at once, the compiler returns multiple package bundles, each one relating to a part of the pipeline.
+\npar When a job completes, the pipeline compiler needs to continue compilation with the continuation state of the associated package. The continuation state captures the choices which have been made in the selected package. For example, where a decision to parallelise over 5 jobs is made, the next step may also have to work in those same five parts. The compiler may choose to use the continuation state in whichever way it wants; it is not required to continue directly from the same position. An alternative to using continuation state would be to re-evaluate the compilation from the relevant step in the configured pipeline, discovering any already carried-out work in the same way as any other existing data.
+\npar The details of a pipeline compiler are likely to be quite complex. In appedix \ref{app:localCompiler} we give a sketch of the \textit{single pass local compiler}, a fairly basic compiler which works by doing a single expansion pass as it goes through the pipeline.
+\subsubsection{Bundle Pool}
+\npar The bundle pool holds the various bundles generated by the pipeline compiler. Since choosing a package from a bundle implies fixing an execution strategy, and is dependent on the state of the system, we want to keep bundles around for as long as possible. As such, we should keep the bundle around until a package is selected for execution.
+\npar The bundle pool need not apply any form of prioritisation, since this will be covered by the package pool.
+\subsubsection{Bundle Selector}
+\npar The bundle selector is responsible for choosing a package from each bundle in the bundle pool, according to a strategy selected by the user. This is done by estimating the costings for the resource demand based upon the current resource prices held in the system co-ordinator.
+\npar For example, if a particular job is assigned a fixed budget and a strategy which looks to execute the pipeline as fast as possible, the bundle selector would attempt to pick the package with lowest estimated time to completion which came in under the fixed budget. A strategy that called for executing as cheaply as possible would simply pick the package which has lowest cost according to the current resource costings.
+\npar The selected package from each bundle should be placed in the package pool. However, the bundle selector may subsequently change its mind and select a new package to submit in place of the current one, should resource costings change. This is valid until any jobs from the submitted package begin execution. It \textit{may} be valid after, although this would require killing the previous jobs and abandoning the results.
+\npar Typically, only one package may be selected from each bundle, although this is not a strict requirement; it should be valid to select multiple packages, for example to test which is faster, although this should come at a higher cost.
+\subsubsection{Package Pool}
+\npar The package pool consists of two elements. The first contains all packages submitted by the bundle selector. The steps contained in these packages are then expanded into the second component, the job pool. The job pool is similar to the job queue in more traditional schedulers. We do not call it such since it does not really behave as a queue - as mentioned, we expect jobs to be removed from it before scheduling if the bundle selector changes its mind about how it wants to divide the jobs, and there is certainly no idea that the first thing to be scheduled is the first to run.
 \npar We \textit{do} expect there to be some form of prioritisation to be applied when it comes to scheduling jobs, but this is more likely to be based upon resource offers (made by the job scheduler) and auctions for those resources among the jobs in the job pool.
-\npar The job pool is responsible for determining expected resource usage for a given step through the use of existing statistics about that step and any hints registered in the step catalogue.
+\npar Once one job from a package has begun, we expect all jobs from that package to run, and so the package becomes `locked in', and the bundle may be removed from the bundle pool. Alternatively, we could leave the bundle in to allow the bundle selector to choose to kill existing jobs in order to submit a different package.
 \subsubsection{Job Scheduler}
 \npar The job scheduler receives resource availability notifications (in our imagined deployment model, from Mesos) and is responsible for allocation of these resources to job(s) in the job pool. In other words, the job scheduler is actually responsible for assigning a step to a host (and memory amount, I/O bandwidth etc) to use for execution.
 \subsection{Heap Manager}
@@ -440,6 +430,7 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \item Keeping track of all hosts available to the system.
 \item Keeping track of all steps currently running through the system, their progress and status.
 \item Keeping track of all resource usage over the system.
+\item Keeping track of resource prices based on current usage and availability.
 \item Recording completed jobs in the metadata store.
 \item Restarting any failed host agents.
 \item Facilitating conversation between different parts of the system.
@@ -449,10 +440,11 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \label{sec:metadataSystem}
 \npar The metadata system holds the core register of everything that has been seen, done and output by the Mercury system. At a basic level, the metadata system is responsible for tracking:
 \begin{itemize}
-\item A list of all pipelines (abstract, configured and executable) which have previously run within the system, as well as their connections.
+\item A list of all pipelines (abstract, configured and possibly executable) which have previously run within the system, as well as their connections.
 \item Each step (primitive, composite and parallel) which has run within the system.
 \item Every datum generated by a step, including through importing from outside; its nature, checksum and provenance. Also, whether it still exists within the cache for use by other programs.
 \item All outputs generated by the system, their location and checksum, and whether they can be subsequently retrieved to use as inputs for another pipeline.
+\item Historical records of resource prices.
 \end{itemize}
 \npar The above list defines a minimal set of information needed to implement much of the above functionality. There are various other data which it might be useful for the metadata system to store - for example, a full log of everything done by the system.
 \npar The metadata system provides the majority of the checks and guarantees underlying the PRIOS capabilities of the system; as such, it must be highly resilient to outages, and deal with them in a predictable manner.
@@ -506,5 +498,69 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \item A means of ascertaining the progress of this particular step.
 \end{itemize}
 \npar As mentioned, the program part of the step specification could potentially be written in multiple languages, provided there exists a suitable execution agent capable of interpreting the specification. The step id is likely to be generated as some kind of checksum of the above information, since this provides a guarantee that the step cannot be modified without changing the id.
+\begin{appendices}
+\section{The single pass local compiler}
+\label{app:localCompiler}
+\npar In this appendix, we present a potential compilation model called single pass local compilation. This is named because it carries out a single pass through the pipeline, expanding as it goes and refusing to backtrack, and because it compiles the bundles for each step independently of the rest of the pipeline or any other pipelines.
+\npar In spite of these drawbacks, local compilation still lets us do a great deal of potential optimisation on the pipeline, incorporating reuse of previous results (both stored and otherwise), knowledge of the cluster resource availability, and our models of likely execution time.
+\npar The relevant state (see \ref{sec:pipelineCompiler}) in this compilation model is the set of current node pointers (e.g. the nodes which are currently executing, or need to be executed next) in the configured graph, and the partially executable pipeline corresponding to each currently executing node. This latter shall be explained in more detail as we go along; to start the pipeline, we set the current node pointers to the input nodes (e.g. nodes which have no inputs connected to the output of another node), and the partially executable pipeline associated with each node to be empty.
+\npar The execution then proceeds as such: we first attempt, in the forward pass, to use our history of previous jobs to determine whether we can skip any steps forward by re-using previous results. We then, in the backward pass, work out whether we have any stored results associated with these previous runs. This gives us a set of starting points. We then calculate the cost for starting the pipeline from each of these points, take a subset of these, and submit them to the bundle pool.
+\npar Recall that our graph has two dimensions: it has length, which represents moving forward through the graph, but it also has depth; the number of composite or parallel nodes we have expanded to reach our position. The forward pass performs a length-first exploration, only exploring deeply when we can go no further forward. The backward pass does the same, but in reverse.
+\npar To better understand some of the detail here, please consider the following algebraic data type, used to represent some of the state passed through the system:
+\begin{lstlisting}
+data Expansion = None | Single Tree | Bundle [Tree]
+data Tree = Tree Pipeline [(NodePointer, Expansion)]
+data FlatTree = FlatTree Pipeline [NodePointer]
+data State = State Pipeline [(NodePointer, FlatTree)]
+\end{lstlisting}
+\npar A Tree captures one `level' of depth in the exploration of a single branch of a pipeline. It contains the pipeline at that depth , the set of node pointers at that depth, and a set of expansions, each corresponding to one of the node pointers. The expansion can be `None' (if at a primitive node), may contain a single subtree (if at a composite node) or a bundle of subtrees (at a parallel node). This definition is clearly recursive, terminating where all `Expansion's are `None'.
+\npar A `FlatTree' represents a tree in which all expansions are `None' - e.g. all steps are primitive. The `State' captures the top-level pipeline, where each current node pointer has been fully expanded. This is what we mean by `single-pass' - once an expansion has been decided upon by a previous compilation, that fully-expanded plan is committed to until it returns to the top-level pipeline.
+\paragraph{Forward pass}
+The forward pass goes forward through the graph, and attempts to work out where we can use the results of previous pipelines to short-cut the computation.
+\begin{enumerate}
+\item We start with a `State' representing the top-level pipeline. The set of starting nodes are given by the nodes pointed to by the `FlatTree's - which may be a primitive node at the top-level.
+\item From these starting nodes, we walk forward through the graph(s). At each node, we look up in the pipeline catalogue and determine any matching assertions based on the step and inputs. This gives a series of `alternate' steps.
+\item In the metadata system, look to see whether we have a record of a previous run of this step, or any alternate, on the given input.
+\item If so, we may take the output id from that record and proceed to the next step, moving the current node pointer forward by one (branching if necessary) and setting the input id(s) to the next step using the relevant output id(s) from the metadata record.
+\item If, on the other hand, we cannot find a record for the current node, we have three options:
+\begin{itemize}
+\item If the current node is primitive, we cease exploring this branch.
+\item If the current node is a composite node, we descend, expanding the composite node into its constituent parts, and we continue exploration from the input nodes to the composite subgraph.
+\item If the current node is a parallel node, things are a little more complex, since there are many possible expansions of the parallel node. At this point, we branch again, choosing a number of these possible expansions to explore (see \ref{sec:expansionOfParallelSteps}) and exploring them all in parallel. There are two possible results of this. In the first one, we find a plausible path that reaches the end of a subgraph and returns to the main graph. In this case, we cease exploring other paths and continue walking along the main graph. In the second case, none of the paths manage to reach out of the subgraph. In this case, we capture all of this information as a `Bundle' and return it.
+\end{itemize}
+\item If, by moving the pointer forward, we reach the output(s) of a subgraph, then the pointer should move upward to the relevant output(s) in the surrounding graph, and exploration continue from there.
+\item We should now have a single `Tree', where each node pointer is associated with an expansion into a subtree or bundle of subtrees.
+\end{enumerate}
+\paragraph{Backward pass}
+The backward pass starts from the tree identified in the previous pass. It then walks backwards through the graph from the deepest NodePointers on each branch to determine the latest point for which we have data stored.
+\begin{enumerate}
+\item We start with the leaf node pointers identified in the previous step - e.g. the node pointers whose expansion is `None'. 
+\item At each node, look up in the metadata system and heap manager whether the identified inputs still exist in the heap, or have been previously output from the system to a persistent location.
+\item If so, mark the current node and cease exploring this branch. We also at this point inform the heap manager that this resource is now referenced by a running pipeline.
+\item If not, we have three possible options:
+\begin{itemize}
+\item If the current node is primitive, we traverse backwards to the previous node.
+\item If the current node is a composite node, we descend, expanding the composite node into its constituent parts, and we continue exploration from the output nodes to the composite subgraph.
+\item If the current node is a parallel node, we choose a number of possible expansions to explore (see \ref{sec:expansionOfParallelSteps}) and explore them all in parallel. There are two possible results of this. In the first one, all subgraphs ultimately walk backwards and out of the subgraph to its inputs. In this case, we collapse the bundle and continue walking backwards in the parent graph. In the second case, the walk may terminate in certain nodes in certain subgraphs in the bundle. In this case, once we have finished exploring all subgraphs (e.g. we have reached termination at every node involved), we output the whole lot as a subgraph bundle attached to the parent node.
+\end{itemize}
+\item If, during the backwards traversal, we reach the input(s) of a subgraph, then the pointer should move upward to the relevant input(s) in the surrounding graph, and exploration continue from there.
+\item We should now have a single `Tree' whose leaf node pointers point to steps which can be carried out using data currently available in the system. The tree branches in two ways - branching to different substeps, and at each `Bundle' expansion. Substep branching represents steps which can be executed independently. Bundle branching represents choice - multiple possible ways to execute this part of the pipeline.
+\item The `Tree' format allows us to capture the full dependency situation between these concepts - e.g. that we can execute A \textit{and} (B \textit{or} (C \textit{and} D)). The bundle pool, however, only accepts (for simplicity's sake) \textit{or} concepts at the highest level - e.g. a bundle cannot contain other bundles. We are therefore required to move any bundle branching to the top. We do this by rewriting the tree from the bottom with the following rule:
+\begin{enumerate}
+\item Where we have a tree containing a bundle at one of its node pointers, rewrite that into a bundle of trees containing the appropriate tree from that bundle at that node pointer. This may have the effect of turning a `single tree' expansion into a bundle.
+\end{enumerate}
+This has the effect of `pushing` the bundling structure to the top of the tree. It may also result in a large number of resulting trees where we have multiple parallel nodes in a pipeline, since we get a combinatorical explosion here. If this turns out to be the case, we may need some strategy to prune certain options as we go. Note that we do not expect this - this would only happen in a pipeline which immediately parallelises something which is itself running in parallel whilst doing no other operations first.
+\item Finally, since our state only allows `FlatTree's, we need to collapse each tree in the bundle into a `FlatTree'. This is fairly simple, and is just achieved by `inlining' every tree into its parent pipeline. This simplifies the state (e.g. we are just carrying a single pipeline around) at the cost of being committed, for the remainder of the execution of a step in the top-level graph, to the execution plan decided upon when that step was first encountered.
+\item We now need to cost each tree in each bundle (in terms of resource usage), in order to give the user (or the user's agent) enough information to decide on an execution plan. We do this using the data stored in the metadata system concerning previous invocations of the same or similar commands as those in our pipelines (on similar data). We evaluate both the expected cost of the current steps (e.g. those which will go on to become jobs) and (with some lower accuracy) the expected cost of the rest of the pipeline (again, based on similar pipelines and data).
+\end{enumerate}
+\subsection{Expansion of parallel steps}
+\label{sec:expansionOfParallelSteps}
+\npar Where we have parallel steps, there are multiple possible ways to expand them (e.g. multiple choices for the parallelisation parameters), and we wish to decide upon a sensible number of these as candidates for execution.
+\npar Obviously, there is no clear correct answer to this. As such, we instead suggest the following heuristic:
+\begin{enumerate}
+\item Firstly, use the current and historic system load to generate a sensible range of values and add these.
+\item Then, look in the metadata system for and previous invocations of parallel steps on the same input data and sharing the same (primitive) head nodes. Add the parameters which were used to run these previous steps.
+\end{enumerate}
+\end{appendices}
 \printglossaries
 \end{document}
