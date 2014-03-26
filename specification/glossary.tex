@@ -56,5 +56,10 @@ description={A low-level pipeline corresponding to the actual series of steps to
 
 \newglossaryentry{checkpoint}{
 name={checkpoint},
-description={A checkpointing system allows for currently running jobs to be suspended to disk (by serialising the contents of memory, the state of file handles and system resources etc) and resumed later, potentially from a different host}
+description={A checkpointing system allows for currently running jobs to be suspended to disk (by serialising the contents of memory, the state of file handles and system \glspl{resource} etc) and resumed later, potentially from a different host}
+}
+
+\newglossaryentry{resource}{
+name={resource},
+description={A capability available to Mercury for use in running jobs. Examples could be storage space, I/O, CPUs, Memory, or further hosts.}
 }
