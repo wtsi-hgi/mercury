@@ -13,7 +13,13 @@
 \usetikzlibrary{calc,shapes,arrows,positioning}
 \makeglossaries
 \setlength{\parindent}{15pt}
-\author{Nicholas Clarke}
+\author{
+Nicholas Clarke \\ \texttt{nc6@sanger.ac.uk}
+\and
+Joshua Randall \\ \texttt{jr17@sanger.ac.uk}
+\and
+Martin Pollard \\ \texttt{mp15@sanger.ac.uk}
+}
 \title{Mercury specification}
 \newcounter{paracounter}
 \newcommand{\npar}{\par\noindent\refstepcounter{paracounter}\theparacounter.\space}
@@ -589,6 +595,8 @@ This has the effect of `pushing` the bundling structure to the top of the tree. 
 \item Firstly, use the current and historic system load to generate a sensible range of values and add these.
 \item Then, look in the metadata system for and previous invocations of parallel steps on the same input data and sharing the same (primitive) head nodes. Add the parameters which were used to run these previous steps.
 \end{enumerate}
+\section*{Acknowledgements}
+Many thanks to Tommy Carstenessen for his comments from a user perspective in trying to define the user interfaces, and to Irina Colgiu for other assorted comments.
 \end{appendices}
 \printglossaries
 \end{document}
