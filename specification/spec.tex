@@ -1,4 +1,11 @@
+% !TEX TS-program = pdflatexmk 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Mercury System Specification
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % run `makeglossaries spec` whenever  glossaryentries are added (hopefully in glossary.tex)
+% nested tikz nodes requires pdflatex or xelatex (dvips will not work!): http://tex.stackexchange.com/questions/186583/referring-to-nested-tikz-nodes-works-with-pdflatex-but-not-with-latex
+
 \documentclass[10pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
 \usepackage{amsmath}
@@ -11,8 +18,7 @@
 \usepackage[style=long,toc,xindy]{glossaries}
 \usepackage[toc,page]{appendix}
 \usepackage{tikz}
-\usetikzlibrary{calc,shapes,arrows,positioning}
-\makeglossaries
+\usetikzlibrary{positioning,calc,shapes,arrows}
 \setlength{\parindent}{15pt}
 \author{
 Nicholas Clarke \\ \texttt{nc6@sanger.ac.uk}
@@ -21,9 +27,11 @@ Joshua Randall \\ \texttt{jr17@sanger.ac.uk}
 \and
 Martin Pollard \\ \texttt{mp15@sanger.ac.uk}
 }
-\title{Mercury specification}
+\title{Mercury System Specification}
 \newcounter{paracounter}
-\newcommand{\npar}{\par\noindent\refstepcounter{paracounter}\theparacounter.\space}
+%\newcommand{\npar}{\par\noindent\refstepcounter{paracounter}\theparacounter.\space}
+\newcommand{\npar}{\par\noindent\space}
+\makeglossaries
 \include{glossary}
 \begin{document}
 
@@ -32,22 +40,38 @@ Martin Pollard \\ \texttt{mp15@sanger.ac.uk}
 \pgfsetlayers{background,main,foreground}
 
 \maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Abstract
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{abstract}
 We present a specification for Mercury, a hypothetical pipeline system designed for use in human genetics workflows. Drawn from previous experience managing and running genetics pipelines, we identify a number of specific capabilities that would be desirable for the purpose of provenance tracking, repeatability and optimality of experiment workflows.
 \end{abstract}
 \tableofcontents
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Introduction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Introduction}
-\npar Within human genetics, there is a need to be able to design and execute specific \glspl{workflow} (\glspl{pipeline}) for genome analysis on a reliable, repeatable and efficient basis. At present, HGI runs a variety of pipelines for human genetics projects. These are run against a Linux cluster using Lustre-backed storage by the following two tools: 
+\npar Within human genetics, there is a need to be able to design and execute specific \glspl{workflow} (\glspl{pipeline}) for genome analysis on a reliable, repeatable and efficient basis. At present, HGI runs a variety of pipelines for human genetics projects. These are typically run against a Linux cluster using Lustre-backed storage by the following tools: 
 \begin{itemize}
+\item \href{http://www.ibm.com/systems/platformcomputing/products/lsf/}{LSF} is a batch scheduler and job executor, responsible for taking an individual job and executing it on some compute resource. LSF additionally has the ability to manage job dependencies, but these features are not currently in widespread use at the Sanger. LSF is a commercial offering, originally developed by Platform Software and now owned and licensed by IBM. 
 \item \href{https://github.com/VertebrateResequencing/vr-pipe}{VRPipe} runs as the \textit{orchestration} framework for current pipelines. It takes a description of the workflow (as a Perl script) and is responsible for tracking dependencies between jobs, submitting them to the executor and monitoring their progress.
-\item \href{http://www-03.ibm.com/systems/technicalcomputing/platformcomputing/products/lsf/}{LSF} runs as the executor, responsible for taking an individual job and executing it on some compute resource. LSF additionally has the ability to manage job dependencies, but these features are not currently in use at the Sanger.
+\item \href{https://github.com/wtsi-hgi/vr-codebase/blob/master/modules/Runner.pm}{Runner.pm}
 \end{itemize}
-\npar Whilst these tools work suitably well for the general usage pattern at the Sanger, they show a number of limitations which it would be desirable to work around. In particular, HGI is interested in the areas of \textbf{data provenance}, \textbf{experiment repeatability}, \textbf{experiment isolation}, \textbf{pipeline optimisation} and \textbf{pipeline security}, hereafter referred to as PRIOS.
+\npar Whilst these tools work suitably well for the general usage pattern at the Sanger, they show a number of limitations which it would be desirable to work around. In particular, HGI is interested in the areas of \textbf{data Provenance}, \textbf{experiment Repeatability}, \textbf{experiment Isolation}, \textbf{workflow Optimisation} and \textbf{data Security}, hereafter referred to as PRIOS.
+% TODO: add other systems under consideration (SLURM, SGE, eHive, Condor, etc)
+% TODO: revise motivation for this.
 \npar Human Genetics has recently taken delivery of a new cluster (hgs4) intended primarily for pipeline usage. This presents us with the opportunity to re-evaluate our current toolset and practices and think about what we would really like in a pipeline execution system. This document presents a write-up of a series of meetings held on the topic, and is intended to serve as a specification for a potential future system embodying these desires.
 \npar This document should ideally present the requirements for such a future system, and serve equally well as a guideline for the design of a new system or as a standard to evaluate existing systems by. Inevitably, however, we shall fall into the trap of starting to design a new system rather than just specify it. Where possible, sections that veer into design or even implementation will be flagged as such; it is quite likely, however, that some will escape. The reader is asked to bear this in mind when applying this document.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The basics of a pipeline system
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{The basics of a pipeline system}
 \npar In this section, we briefly introduce the basics of a pipeline system as we would like it to operate. This should set the scene for the more specific goals and functional components outlined in following sections.
 \npar We wish to build a system capable of taking an abstract description of a computation to run and running it against a specific dataset using particular resources. The description (hereafter referred to as a \gls{pipeline}) will in general consist of the composition of a set of individual steps. Each step itself takes a number of inputs and produces a number of outputs. The pipeline composes these steps by binding the output of one step to the input of another, forming a \textit{directed acyclic graph}. Each pipeline may have some unbound inputs and outputs - these represent the inputs and outputs of the pipeline itself. To run the pipeline, these inputs will be bound to specific data (we will say that we run the pipeline on that data) and the steps will be processed in dependency order to produce the output.
+
 \subsection{Steps}
 \npar In order to accurately describe a `step', we will build up from the simple case to the more general description which we will actually work with. With this in mind, then, we start by saying a \gls{primitive step} corresponds to a program that can be executed on a single host. Like all steps, a primitive step has inputs and outputs, which are themselves typed to specify what kind of data the step takes in and gives out. The pipeline executor will ultimately run each primitive step by assigning it to a particular host and set of resources (e.g. a certain amount of memory, a number of CPU cores) and binding its inputs to some pre-existing data. We call such a running step a \gls{job}.
 \npar In many cases, a \gls{primitive step} will correspond to a way of invoking an existing program. It will have inputs corresponding to that program's inputs and configuration options. In order to convert existing programs to allow them to be run within a pipeline, one would write a wrapper to provide the missing semantics of a pipeline step to the standalone executable. For example, a wrapper would be responsible for declaring the types of data on which an executable operates, for specifying its inputs and outputs, and for correctly binding such inputs into a correct invocation of the program.
@@ -57,23 +81,33 @@ We present a specification for Mercury, a hypothetical pipeline system designed 
 \npar Frequently, the modus operandi for pipeline jobs is to split the data into a number of pieces and operate independently on each piece. We could explicitly declare this by having an individual step for each piece of the data we wish to operate on. However, this would yield very complex pipelines which are specifically tuned to the number of pieces of data and contain a large amount of repetition. Instead, we introduce the concept of a parallel step. Some steps may take an input of an array type - e.g., the command `cat', which takes any number of files and concatenates them, might be of type $[File] \rightarrow File$ (if we redirect its output to disk). A parallel step takes as input an array of data but then operates on each element individually and in parallel. We can think of a parallel step as being the `map' combinator, with signature $(a \rightarrow b) \rightarrow [a] \rightarrow [b]$ which takes as parameters both the array of data and \textit{another step} which gets applied to each element.\footnote{One may, of course, generalise this and begin considering the idea of other higher order steps. There is potentially benefit in allowing the `bind' or `fold' combinators, which allow us to implement a great deal more. However, we shall not explore this area for now, and it may be expedient to hide this formalism even if we use it.}
 \npar Parallel and composite steps are separate and non-interacting abstractions - one may have a composite step included in a parallel step, or a parallel step inside a composite step.
 \npar Whilst we have gained generality with these new types of steps, we have lost one of the fundamental features of \glspl{primitive step} - that each one could be executed on a host. In the next section we detail how we propose to regain this feature from our now higher-level model.
+
 \subsection{Pipelines}
 \npar By expanding our definition of what a step can be, we have complicated our notion of how a pipeline is to be executed. In this section we propose some distinctions which underlie our use of the term `pipeline' and which provide us with a means to recover the execution semantics of a pipeline composed only of primitive steps. Unlike in the previous section, where we started at the simple level and built abstractions, we shall start with the highest abstraction and detail the deconstruction into primitives.
+
 \subsubsection{Abstract Pipeline}
 \npar At the highest level, we have the \gls{abstract pipeline}. An abstract pipeline corresponds most exactly to a top-level description of a series of actions we would like to have performed against some data. A typical description might be ``A pipeline for BAM improvement using Samtools'', or similar; abstract pipelines might be suitable to expose to customers in some sort of catalogue, offering the various services we can run.
 \npar An abstract pipeline may be composed of primitive, composite and parallel steps. It also has a number of free\footnote{\href{http://en.wikipedia.org/wiki/Free_variables_and_bound_variables}{Wikipedia: Free and bound variables}} inputs and outputs. This makes an abstract pipeline reusable between multiple inputs, and also allows it to be included as a composite step in other pipelines.
 \npar An abstract pipeline must in general have \textit{some} free inputs and outputs (or else it has no effect), but this is not to say that all inputs to steps which are not connected to the output of another step must be free. For example, inputs corresponding to configuration parameters may be bound to static values in an abstract pipeline.
+
 \subsubsection{Configured Pipeline}
 \npar At some point, one needs to decide what data is going to be run through the pipeline, and bind the free variables of an abstract pipeline to values identifying where to get the input from. We shall call an abstract pipeline with all inputs and outputs bound a \gls{configured pipeline}. A configured pipeline represents a standard request made to HGI to run one of our pipelines on a particular project's data.
 \npar A configured pipeline still retains the high-level description of steps to execute, being composed of composite, parallel and primitive steps.
+
 \subsubsection{Executable Pipeline}
 \npar At some point, each of the composite and parallel steps need to be compiled into the concrete set of primitive steps which will be executed on compute hosts. This process takes a configured plan and expands the composite and parallel steps into multiple primitive steps to produce what we shall call an \gls{executable pipeline}.
 \npar The exact process of producing an executable pipeline is discussed in more detail in subsequent sections, in particular on optimisation (see \ref{sec:optimisation}).
+
 \subsection{Metadata}
 \npar There is some ambiguity over the meaning of the term `metadata'. For the purposes of this document (and the Mercury system), we define metadata as data which is used by the Mercury system, rather than simply by a pipeline running within the Mercury system. Data checksums, for example, are used by Mercury in provenance tracking, and so count as metadata. Things such as lane id, which may be associated to a specific input, are not used by the Mercury system, and so count as data. This differs from the nomenclature as used in VRPipe.
 \npar On occasion, we may have metadata generated by the system which needs to be used as data within the pipeline, or data generated by the pipeline which needs to be used as metadata within the system. For example, certain utilities may have the option to checksum their input data given that checksum, or may output a count which should be used in determining a parallelisation parameter (see \ref{sec:optimisation}). The system needs to support lifting data to metadata and vice versa.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Goals
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Goals}
 \npar In the introduction, we introduced some high-level goals in which HGI has a particular interest. These are not requirements in their own right, being too high-level, but should give rise to requirements in the same way as other top-level goals such as 'the system must be usable'. In this section, we'll take a look at these goals, elaborating on and discussing them in order to provide context and motivation for the requirements introduced in the following sections.
+
 \subsection{PRIOS Goals}
 \subsubsection{Data Provenance}
 \label{sec:provenance}
@@ -81,24 +115,30 @@ We present a specification for Mercury, a hypothetical pipeline system designed 
 \npar There are various justifications for this. Partially, it is about repeatability (as in the next section) - being able to identify how something came about makes it much easier to repeat it. Partially it is about data integrity - being certain that results were generated using the precise input data which you thought they were. Optimisation also calls for provenance data - once we understand how precisely data were generated, we know how expensive they are to recreate and how important it is to store them. And, in part, we want to be able to document the process for users' own purposes, so they can check what happened as part of an analysis run by HGI.
 \npar Implementing provenance tracking leads to a number of requirements. We need to keep track of pipelines both as designed (in general, without specific reference to data) and as executed (on which hosts, at what time). We need to ensure that external dependencies are explicitly captured (which in turn leads to the isolation goal), and isolated both in the planning stage (separating external I/O from internal - e.g. passing data between steps in a pipeline) and in the execution stage, preventing steps from unknowingly accessing external resources.
 \npar Provenance tracking becomes slightly more tricky with the inclusion of optimisations that enable reuse of results (see section \ref{sec:optimisation}). This is because the same data may be generated in multiple ways by multiple people, or, in some cases, may be used in one experiment having been generated in an entirely different way by another (but where we have evidence that the results will be identical - perhaps through carrying out a third experiment). At a tracking level, this problem is not difficult - we should, as a matter of course, track \textit{every} time data is generated or recovered from a cache, with an indication of which pipeline and pipeline components generated it and whether it was actually generated or cache-recovered. When presenting these data to users, however, thought must be given to how to deduce the \textit{correct} provenance for any particular enquiry from the context of the question.
+
 \subsubsection{Experiment Repeatability}
 \label{sec:repeatability}
 \npar Following on from provenance, we have the goal of making our pipelines repeatable. This goes a step further than provenance; rather than simply identifying where data comes from, we would like to be able to recreate it, in spite of potential changes to the underlying infrastructure. 
 \npar This gives rise to the ideas of encapsulation already implemented in Mercury capsules, wrapping up an environment suitable to run a step of the pipeline. Whilst capsules provide repeatability of individual steps, we are also forced to consider repeatability of the entire pipeline, which requires us to suitably abstract away from specific hardware or infrastructure constraints. This is one advantage to moving away from the current LSF-based approach, for example.
 \npar Also covered under repeatability is the requirement to rerun an experiment whilst changing a fixed number of factors, and tracking effects. For example, we might want to rerun an old pipeline using a new version of a particular piece of software to see whether it meaningfully alters the output. This same idea applies to rerunning a pipeline on new data.
+
 \subsubsection{Experiment Isolation}
 \npar Isolation is, in many ways, an enabling goal. Isolation of experiment processing allows us to be certain of the provenance of generated results, and enables us to move the isolated experiment to another system to repeat it. By isolating each pipeline (and each step of the pipeline), we enable meaningful statistics to be gathered about resource usage and running profile to allow for optimisation, and prevent other systems from interfering with the processing in order to provide security.
 \npar Isolation principally sets requirements on the execution of individual jobs, where we need to isolate the actual processing from other jobs on the same host, as well as from the wider environment. Isolation plays into the design of Mercury capsules, which wrap processing up in LXC-based virtual machines. We must also bear it in mind when considering the orchestration component, though it would be strange if pipelines were not conceptually isolated at this level. Care must be given to the interactions of isolation with optimisation of pipelines which share components. We wish to ensure that shared work is not duplicated, but carefully isolate the parts of processing unique to each pipeline.
+
 \subsubsection{Pipeline Optimisation}
 \label{sec:optimisation}
 \npar It has been observed in many places that as the costs for sequencing drop at a faster rate than the costs for processing and storage, we will need to be significantly more efficient in how we process and store sequencing data. Even without this driver, however, we would like to take full advantage of the resources available to us for computation. We need to balance this with the semi-competing desires to be \textit{fair}, which is probably to say that there should be no strategy allowing any subgroup of users to guarantee control of an arbitrarily high proportion of the compute resources, and to support variable allocation of resources to different uses.
 \npar Currently, there are a number of tools in place to try to aid in this process. VRPipe does some resource tracking to try to avoid duplicating previously run jobs, and makes some attempt to estimate the resource requirements of a job in order to avoid requesting more resources than are necessary. LSF then uses a `fairshare' system to allocate resources to users in a way which tries to maximise allocation whilst ensuring that everyone gets appropriate usage rights. Whilst these are good ideas, their implementation has much room for improvement. VRPipe does not handle inter-pipeline sharing and its resource estimation is rudimentary. Likewise, whilst the fairshare features in LSF are probably fair (whilst there are dominant strategies, they generally involve exploiting other parts of the system and so might be considered `cheating'), they do not encourage efficient resource usage: a common situation is for there to be a surfeit of CPUs available for low-memory jobs, but a disincentive to use them because this harms the global priority you might need to compete for more contested resources. People don't want to eat the boring biscuits in case they are placed lower in the queue for when the chocolate coated ones come around, and so we have a load of boring biscuits being passed around uneaten.
 \npar We would like Mercury to take these ideas (and a few others) and develop them. This can be broken down into a few sub-themes:
+
 \begin{enumerate}
 \item Firstly, we would like to empirically determine the relative costs of storage and compute. By capturing rich data on how expensive a job is and how large are the data it generates, we can build a picture of a `reasonable' exchange rate between compute time (and other resources) and storage costs. For example, if we know that on average it costs 4 CPU-hours and 2 GB-hours of memory to produce 100GB of output data, then we might infer that something costing 10 CPU-hours and 5 GB-hours of memory but producing only 1GB of output is a very efficient usage of storage over compute. In terms of time/memory trade-offs, this is an ideal candidate for caching. Conversely, something costing a single CPU-hour and 512Mb hours of RAM but producing 50Gb of output is extremely cheap to produce compared to how much it costs to store, and we should almost never keep it around.
+
 \item Separately, but relatedly, we would like to support demand-based pricing of the various resources available to the system (CPU, Memory, I/O etc) and a `fairshare' like system built around this pricing model. At the user-facing level, this would hopefully address some of the problems with the current system in terms of `cheap' resources being underutilised - where there is low demand on a particular resource, the price would drop until demand rose.
 
 At the system level, this model would give us the additional information needed to engage in deliberate currency trading between storage and compute, providing another method to increase efficiency. For example, if we found ourselves with CPU resources in very high demand but a surfeit of disk space, we might choose to `buy' CPU resource by aggressively caching data, lowering the cost of compute at the expense of cost for disk space.\footnote{One can imagine a scenario where we might attempt to do similarly for resources such as CPU and memory by literally trading with other clusters - perhaps offering cheap pricing for CPU-intensive low-memory jobs in return for cheap access to lots of memory. One can imagine this, but we shall discuss it no further in this paper.}
+
 \item Once we are in possession of the mechanisms for evaluating the costs of TMTOs and similar techniques, we would like an infrastructure capable of taking advantage of this as much as possible. To do this it is necessary to identify where multiple pipelines share components and aggressively de-duplicate processing. This should occur both with concurrent pipelines (where shared steps are 'merged') and with pipelines which repeat work previously done by another pipeline. As mentioned in section \ref{sec:provenance} on provenance, this must be done both on abstract pipelines, where we de-duplicate steps which are conceptually the same, and on executable pipelines, where we de-duplicate steps which are executed in the same way.
 
 As an example of this last point, we consider three related pipelines which calculate summary statistics on a list of numbers. They can be described as follows:
@@ -111,11 +151,13 @@ As an example of this last point, we consider three related pipelines which calc
 In this case, pipelines a and b are both doing the same thing as designed. Abstracting over the detail for now, we would like to think of wrapping up the entire process of splitting, operating in parallel and summing into a single step, `count odd numbers', whose result should be fully determined by its input. Under this abstraction, pipelines a and b are identical, and so it should be valid to re-use the end results from a for pipeline b.
 
 Pipelines a and c, on the other hand, are operating on different files, and the input to the `count odd numbers' step is different. However, when we split the file in c into its five parts, we see that those five parts have already been processed as part of pipeline a, and as such we can reuse those parts. Whilst the pipelines are different in design, they share steps as executed, and these steps can also be de-duplicated.
+
 \item In the previous point, we alluded to the idea of `picking' $N$, the chunk size to split the file into before processing chunks in parallel. Parameters such as $N$ may exist in many pipelines - parameters which do not (or should not) affect the outcome of the pipeline but which may have a massive effect on the runtime behaviour and performance characteristics. Taking $N$ as an example, for very high values of $N$ we have very large lists of numbers being processed in serial on a single machine, which could be very slow if we were doing more than counting odd numbers. Conversely, if we pick $N$ to be very small (1, say), we split the file into a very large number of jobs, each of whose overheads are likely to dominate the actual cost of processing the file. Somewhere between these is an optimal value which balances the overheads of multiple processing with the parallelism offered.
 
 Furthermore, since we do not just care about the fastest execution, but about the total \textit{cost} of the job, the best parameter values will depend not only on the job but on the demand and availability of resources. For example, if there are currently a large number of single-CPU low-memory slots available in our earlier example, it may be advantageous to set $N$ low in order to fit into the low-memory slots, whilst if there are large machines around we may wish to simply use a single machine to blow through the whole list.
 
 For cases such as splitting files and operating in parallel, but potentially other parameters, we would like the system to be able to choose a value for the parameter to take advantage of its knowledge of current resource prices and empirical data on the execution parameters of that job. This shifting of responsibility from the user to the system should allow for a more efficient execution, but also removes some of the control from the user in terms of their specific goals. For example, they might not wish to minimise cost but just get the fastest execution regardless of price. To cover this situation, we suggest that the system might implement different strategies for choosing parameter values. The default strategy might be to minimise cost, but another could attempt to minimise runtime, or minimise runtime subject to a cap on cost.
+
 \item Finally, we wish to be able to estimate the resource requirements for a given job in order to avoid under-allocation (resulting in the job failing and needing to run again) or over-allocation (where more resources are committed than are used). Both of these situations result in wasting resources which could be better used elsewhere.
 
 Resource estimates for a job should be based on learned data about previous invocations of jobs involving the same (or similar) steps and/or data. For example, we might start by estimating the mean of the resources used (rather than allocated) by all previous invocations of the same step. Ultimately, we expect this to become a machine learning problem using previous examples as our training points. It is perhaps relevant to note that we should not explicitly be trying to estimate the precise resource requirements, but the resource allocation which minimises the posterior expected loss in terms of resources - so we may deliberately overestimate requirements for jobs where there is a heavy cost to restarting. This also allows us to take the `price' of a resource (as mentioned above) into consideration in our estimation function.
@@ -124,8 +166,10 @@ Where we have a new step, or a step operating for the first time, we may not hav
 
 Sometimes, we may have extra information about the expected resource profile for a new step - for example, we may have explicit bounds on the amount of memory needed, or we may know that a new step behaves in a very similar way to an old step - perhaps because it is simply a new version. The system should support some way of providing this prior information on resource usage. An alternative would be to perform the resource estimation using some features of the step specification rather than specifically to that step, although it is not clear how well this would work (for example, lexicographic distance between names is unlikely to covary strongly with runtime!).
 \end{enumerate}
+
 \npar In terms of requirements resulting from these goals, there are a number. As already mentioned in sections \ref{sec:provenance} and \ref{sec:repeatability}, we need to track data about the resources used in pipeline execution and storage. We need the flexibility to perform trade-offs between storage and compute, which means the system needs to `own' its own storage, able to perform deletions or compaction without this being noticed by users. We need to track provenance information in order to decide whether data should be reused from a previous run. We also need a way of indicating that a given step is \textit{not} recreatable - for example, because it talks to an external resource which we do not govern.
 \npar The need to de-duplicate at multiple levels, and to allow certain parameters to be picked by the runtime, requires that we have some conception (or at least record) of pipelines at multiple levels of abstraction, and to track the results as seen from each of those levels.
+
 \subsubsection{Security}
 \npar After the \textit{tour de force} of optimisation, there is comparatively little to say about security, which is mostly interesting for how it interacts with some of the other goals (principally optimisation). We break down security into the classic three security attributes of confidentiality, integrity and availability:
 \begin{itemize}
@@ -133,8 +177,10 @@ Sometimes, we may have extra information about the expected resource profile for
 \item \textbf{Integrity} - Data integrity covers the ability of the system to ensure the correctness of generated data even in the presence of errors, along with the ability to provide sufficient evidence for that correctness. The latter, for a previously generated dataset, is covered mostly by the trail of provenance data which we collect, dealt with already in section \ref{sec:provenance}. Ensuring the correctness of data in the presence of errors will require both a resilient system capable of detecting and sensibly handling errors (dealt with in the later section on \ref{sec:resilience}), and a system of checks and balances which guard against errors outside of the control of the system - for example, capable of detecting corruption in data as it moves between steps.
 \item \textbf{Availability} - This comes in two flavours - availability of generated results, and availability of the pipeline system. The latter we will cover later in the more appropriate later section \ref{sec:resilience} on resilience. The former involves the semantics for data which leaves the system's direct control. In general, we may not wish to maintain separate copies of the data inside Mercury's control and outside of it. However, data that has left the system is no longer under the total control of Mercury - it cannot decide to delete it, for example. Some conception would be desirable for referencing data which has left the system in such a way that it can still be drawn back in for pipeline use.
 \end{itemize}
+
 \subsection{Other goals}
 \npar The PRIOS goals represent a specific area in which HGI is particularly interested in extending our pipeline systems. However, there are also a number of other goals which are intrinsic to the proposed system being useful and suitable as a general replacement for the current Mercury pipeline system. We address these in the following section.
+
 \subsubsection{Resilience}
 \label{sec:resilience}
 \npar Running over a large-scale cluster, errors with individual low probability become a regular occurrence, and we therefore require our system to deal with them accordingly. Further, leaving aside even the error case, the Mercury system will rely on a number of tools outside its control. In the initial conception, Mercury at the Sanger will be running on a number of private compute nodes as well as some shared with other uses, using two or three distinct Lustre storage units for scratch storage. Any of these units may be taken down for reasons outside of Mercury's (or HGI's) control, and Mercury must be able to cope with these outages.
@@ -142,6 +188,7 @@ Sometimes, we may have extra information about the expected resource profile for
 \npar The first responsibility upon detecting an error is to ensure the integrity of associated data. Where errors have been detected on a node, or with a particular resource, this may taint recent results which have been generated on that node or using that resource. The pipeline may need to decide to backtrack and rerun certain steps whose results are now suspect. A failing node will need to be closed to new jobs until the system (or a user) can verify it is working correctly. Where there are more transient errors, such as reading a file from disk and getting an invalid checksum, it may only be necessary to restart the step in question, though if such an error persists then the pipeline may need to backtrack.
 \npar After guaranteeing the integrity of working data following an error, the system should also attempt to continue running to the best of its ability with whatever capability it has remaining. If a pipeline depends on data which is no longer available, it could attempt to recreate that data in another location (subject to resource constraints and the likelihood of the original data becoming available again). Jobs should be restarted on working hosts. Of course, failures in the system may well result in large price increases as a lower number of resources are available to service an increased demand!
 \npar There are certain places where simply monitoring for failure and acting accordingly will not work. For example, should the core metadata system fail, then there is very little the system can do (except, perhaps, keep running existing jobs in the hope that it will come back up). Where we have examples such as this, we must instead consider resilience to an initial error - for example, by supporting multiple fail-over metadata servers with some communication between them.
+
 \subsubsection{Flexibility}
 \label{sec:flexibility}
 \npar The current pipelines used by HGI are somewhat specific to Sanger infrastructure, tied to LSF and Lustre and our current use of them. Whilst this is in no way a problem at present, we can envision wanting to replace these at some time in the future, or to hook other resources into the system and allow them to be used. We may also wish to run Mercury at places other than the Sanger which have quite different infrastructure.
@@ -167,10 +214,12 @@ Mercury will ideally be able to support multiple different backing storage mecha
 \end{itemize}
 \npar In section \ref{sec:repeatability} we talk about the goal of wishing to enable repeatability of an experiment in another place, or at some time in the future. Whilst the minimal requirements we describe here should allow pipelines to continue running for some time, there will inevitably come a time when changes to the kernel version or LXC result in the breaking of existing pipelines. In order to overcome this problem, we may have to move towards full virtualisation of older Linux versions, rather than simply using container level virtualisation.
 \npar There are two potential approaches to this. The first would deploy VMs running the requisite O/S versions independently of Mercury, and then run Mercury agents inside the VM to connect these VMs to the wider cluster for use in older pipelines. This has the advantage of requiring no special support from Mercury, but has the disadvantages of needing another infrastructure to manage, and making it very difficult to run multiple different pipelines requiring different base versions of the O/S. The second approach would be to introduce a second container system which uses a VM to run an LXC container within it. This would need to expose the same type of container interface as the LXC-based containers, but could delegate much of the work to the internal LXC instance.
+
 \subsubsection{Scalability}
 \npar As our demands for computation increase, it may be increasingly implausible to carry out all computation in house using pre-assigned resources. Whilst we assume that the hgs4 cluster may run Mercury constantly, we may also wish to use other resources such as the general clusters to expand Mercury on a temporary basis, either to cope with periods of increased demand, or to deal with particular jobs possessing unusual requirements.
 \npar Mercury needs to be built to cope with the idea of its fundamental resources - whether in the form of compute nodes or storage resources - being transitory, subject to expansion or removal even during pipeline execution. It should be easy to add a new resource for use by Mercury and have existing Pipelines seamlessly modified to take advantage of it. Likewise when a resource is removed from the system.
 \npar Using \href{http://mesos.apache.org/}{Mesos} as in our preferred deployment option would provide the above capability for compute nodes. However, we still need to consider how to do the same for storage resources (or any other resources not considered here), and if we do not use Mesos (or a similar solution) then we must support this for compute resources as well.
+
 \subsubsection{Usability}
 \npar Mercury should, on the whole, aim to simplify the process of designing and running safe, sensible and composable pipelines.
 \npar In the first part, this means that it should aim to provide good interfaces to support the design and running of pipelines. The interfaces should be easy to use (for an interested, engaged user) and should attempt to reduce the barrier to adding or running new pipelines in the Mercury system. We should aim for both adding and running pipelines to be accessible to software developers and bioinformaticians outside of HGI.
@@ -178,28 +227,34 @@ Mercury will ideally be able to support multiple different backing storage mecha
 \npar The second aspect to this revolves around the idea of 'safe and sensible' pipelines. The system should, so far as possible, attempt to minimise the possibility of a user constructing a pipeline which is accepted as valid by the system but which can never succeed in running. To do this, the system needs to reduce the class of valid pipelines which can be submitted into the system.
 \npar The most obvious way to do this is through the use of a suitably powerful type system. Thus each input and output to a step could be assigned a specific type (e.g. `BAM file'), and it would only ever be valid to connect an output of type `a' to an input of type `a'. This would eliminate a large class of potential errors which consist of trying to connect two parts of a pipeline which operate on different types of data. Such as system could also help from other usability points of view - for example, suggesting possible steps (or pipelines) which are capable of converting from type a to type b.
 \npar The type system would need to be sufficiently flexible to handle things such as multiple different types of BAM files. It could also potentially support types such as `BAM file with at least 30 records'. Precisely how to implement such things - using a subtyping relation, value-dependent typing etc - remains an implementation detail. 
+
 \subsection{Miscellany}
 \npar From our experience in dealing with existing requirements have come about a number of use cases which do not fit neatly into the high-level goals set out above, but which nonetheless represent concerns we should take into consideration when designing our system. We expect that these cases may be considered as extensions to the system rather than critical parts of the core system. However, the ability to admit such extensions must be seen as a goal for the system itself.
+
 \subsubsection{Checkpointing and Migration}
 \npar The information available to the scheduler when it comes to making decisions about which jobs to schedule is sadly imperfect. As far as possible, it should take advantage of the knowledge available to it - the size of the input, empirical data about how long a step usually takes to run, etc. - to make reasonable assumptions about the resource profile of a job, but inevitably these assumptions will be incorrect.
 \npar The scheduler should be perfectly happy to make decisions based upon this incorrect knowledge. However, it should also be able to change its mind at a later point when further information becomes available. One possibility for this is to simply kill the job and reschedule it later, but this may be expensive if it has already carried out significant amounts of work. The alternative is to take advantage of a \gls{checkpoint} system which will try to save the state of a job for subsequent resumption later.
 \npar Checkpointing may also be used for other reasons. For example, if we know a host is going down (see section \ref{sec:outagePlanner} below) then we might want to suspend all jobs running on it and migrate them to another host. We can also do this if we believe a job is trying to expand beyond the resources available to it.
 \npar Whilst potentially cheaper than restarting a long-running job, checkpointing itself has a cost in terms of storage space required to serialise running memory. Where jobs are using large amounts of memory, checkpointing may be more expensive than restarting, and this cost should be considered as any other when considering whether to perform a checkpoint/restart.
 \npar Checkpointing itself is a feature offered by external tools. Currently we use Berkeley Linux Checkpoint/Restart, although there are potentially newer implementations within the Linux kernel itself. Mercury should not express a dependency on any one of these tools, but needs to understand the concept of a suspended job, and the mechanisms for suspending and then restarting a job as part of normal resource management.
+
 \subsubsection{Generalised Assertions}
 \label{sec:generalisedAssertions}
 \npar One of the fundamental ideas we wish to take advantage of is that for certain steps (\textit{pure} or \textit{referentially transparent} steps), we may replace an invocation of a step $ f $ on arguments $ (a_i) $ with the result of a prior invocation of that same $ f $ on those same arguments. Even where we do not have those results cached, we may use this identity to reason about subsequent behaviour of the pipeline - for example, we may decide that we don't need to run it at all if we believe it will generate precisely the same results as a previously executed pipeline.
 \npar This observation lies at the heart of much of the optimisation strategy detailed above in section \ref{sec:optimisation}. However, it is in many ways a blunt instrument, with only two possibilities. Sometimes we would like to be more general. For example, we might wish to state that a particular output of a step depends on one of its inputs, but not the other. Alternatively, we might get a new version of a piece of software which we wish to use for performance reasons, but where we believe that the results should not differ from the previous version. In this case, we might assert that any results generated by the previous version can be used for pipelines running the new version, and vice versa.
 \npar We call such things generalised assertions. Generalised assertions are principally of use to the pipeline planning system - they determine where it should look to determine whether or not a step of a pipeline needs to run.
+
 \subsubsection{Quickcheck-style self testing}
 \npar In the previous section, we discussed purity and how we could use this for pipeline optimisations. However, because we have actually worked with some of the software these pipelines will be running, we are a little sceptical of claims made by particular programs to being pure. As such, we would like Mercury to follow a `trust and verify' scheme. In general, we will assume that they do what they say, and will always return the same output for the same input. Sometimes, however, particularly when resources are very cheap owing to low utilisation, the system may decide to rerun supposedly pure components in order to verify that they are doing what they claim to do.
 \npar We may wish to do the same thing for any of the generalised assertions mentioned in the previous section. On occasion, we might want to go the other way - rather than trust and verify, we would distrust until we had enough confidence in the result, and only then assert such behaviour. This seems particularly likely in cases where a particular version of software is updated - we may not wish to trust anything without checking it first.
 \npar Mercury should ideally allow for support of both styles of property testing in a nice way, using previously run experiments as the source of data to test the system with.
+
 \subsubsection{Outage planner}
 \label{sec:outagePlanner}
 \npar In contrast to errors, we often know well in advance when outages for critical resources are going to occur. Given this, we should be able to take advantage of this foreknowledge in order to better make use of resources in and around the outage.
 \npar For example, on receiving knowledge that a storage system is going down, we might identify data which are going to be needed by queued pipelines and begin moving them to another resource in advance of the outage. Meanwhile, very short or cheap jobs could be moved to using the soon to be outed resource in the knowledge that they will either finish before the outage or be cheap enough to replicate if taken down by it.
 \npar Ideally, one would be able to tell Mercury about the outage schedule of particular resources and have this information used when deciding how to assign resources to particular pipelines or jobs.
+
 \subsubsection{Streaming}
 \npar In order to execute a pipeline, Mercury will need to perform a partial linearisation of the dependency graph - in other words, forcing jobs that serve as dependencies for others to be performed first. This will not form a total order, since some jobs may be independent of each other and may run simultaneously. In general, within each ordered chain, jobs will be executed sequentially, with one job running, outputting, and exiting before the next is allowed to start. This is a sensible strategy to assume for programs which, say, write their output to a file which another program will attempt to perform random accesses into.
 \npar However, Unix has long supported another method of sequencing steps in a computation using its streaming pipe operator. In this model, data is streamed directly from one job to the next without requiring writing to disk in the meantime. This works very well for jobs which simply read a file sequentially.
@@ -222,12 +277,14 @@ seq 1 1000000 | filterPrimes | head -n 5
 \item The second job could be scheduled to start as soon as the first job starts, rather than as soon as the first job finishes. In general, we would like the jobs to start as concurrently as possible, in order as to not have the first job blocking on I/O whilst waiting for the second.
 \item Rather than output and input being connected to one of the standard resources, they would be connected to a `special' resource which would not store data but stream it between them. Note, however, that this resource may choose to do other things, such as checksumming the data or copying it to another resource for storage.
 \end{enumerate}
+
 \subsubsection{MPI}
 \npar Mercury as we have described it is designed mainly for running, in parallel, a large number of jobs which have no inter-dependencies. Where dependencies do exist, linearisation is performed to ensure that one job must complete before the next can start. It might be nice to allow for the running of jobs which are inherently parallel, requiring deployment onto multiple hosts but managing the process of inter-host communication themselves. MPI is the canonical example of how such a job might work.
 \npar There is a reasonably strong argument that Mercury would be the wrong framework to run such jobs in, however. Firstly, Mercury is intended (see section \ref{sec:flexibility}) to be flexible as to its underlying hardware and network model. Making direct network communications to other nodes available to running jobs would break that abstraction somewhat, and could be problematic when some parts of a job are deployed onto different network segments, or even sent off to Amazon or somewhere for processing.
 \npar This objection could be worked around with judicious use of a resource constraints approach, where a job could be specified to require a certain network or similar. However, the second major objection to this behaviour is that it requires out-of-band communication between nodes, making it more difficult to ensure things such as data provenance and repeatability.
 \npar This is not to say that we do not see a place for such jobs; indeed, we believe that their importance is only going to grow. However, it may be that they are better handled by higher level frameworks such as Hadoop which gain more powerful semantics for reasoning about parallel jobs through the sacrifice of flexibility as to how a job operates. Our preferred scenario for the deployment of Mercury has it running atop of \href{http://mesos.apache.org/}{Mesos}, a meta-scheduler allowing resources to be shared between multiple scheduling frameworks. This would allow Mercury to run alongside Hadoop, servicing different type of jobs.
 \npar All of that having been said, it may be that there is still a desire to include MPI-type jobs into the purview of Mercury. This problem is unlikely to be insurmountable, but would require that we consider safe ways of constraining network communication, of passing \glspl{metadata} (e.g. host addresses) into jobs, and of generalised resource constraints which would allow, for example, a \gls{step} to specify that all jobs resulting from it must be deployed onto the same network segment.
+
 \subsubsection{Data reference transformations}
 \begin{figure}
 \begin{center}
@@ -258,11 +315,17 @@ seq 1 1000000 | filterPrimes | head -n 5
 \caption{Here, the outputs from A and B are merely paired in `zip', whilst no work is done on the relevant data.}
 \label{fig:referenceTransform}
 \end{figure}
+
 \npar Consider the pipeline fragment given in figure \ref{fig:referenceTransform}. Here, step `A' outputs an array (or list, or collection) of outputs of type $s$, whilst step `B' outputs an array of outputs of type $t$. Step `D' operates on pairs of items $(s,t)$. For example, steps `A' and `B' may output sequences of BAM and BAM index files respectively, and step `D' require paired BAMs and indexes to operate.
 \npar In order to pair these types, we add a further step into the middle. This step takes the two sequences $ \{s_i\} $ and $ \{t_i\} $ and outputs a new sequence of pairs $ \{(s_i, t_i)\} $. This is generally known as `zipping' the two sequences; we can also consider various other operations that work in such a way (such as taking the Cartesian product of the two sequences).
 \npar The important thing to notice about the `zip' step in the middle is that it does not actually do anything to the data - no file of type $s$ or $t$ needs to be read. Rather, it simply transforms the references to the data, pairing them up and passing them on. This is a fairly standard operation, but does require the more general referencing system rather than simply file references. This should also be supported by the step specification in terms of allowing steps to transform only references whilst never reading in any data.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% External Interactions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{External Interactions}
 \npar Covered under this heading are the various ways in which we wish Mercury to interact with other people and systems. It will be divided in the following way: firstly, we shall cover the expected interactions with users, divided into the various roles we see interacting with the system. Secondly, we shall deal with the expected interactions with external systems.
+
 \subsection{User Interactions}
 \subsubsection{Mercury Administrator}
 \npar The Mercury administrator (typically a member of HGI) will be responsible for the overall operation and stability of the system. They will need to interact with the system in the following ways:
@@ -275,6 +338,7 @@ seq 1 1000000 | filterPrimes | head -n 5
 \item Configuring user/group permissions and quotas (though see \ref{sec:interactions:ldap} below).
 \item Management of jobs with the permissions of the job owner.
 \end{itemize}
+
 \subsubsection{Step Creator}
 \npar Step creators are responsible for developing new \glspl{step}. These may represent new pieces of software, new capability build specifically for Mercury, or new versions of pieces of software for which steps already exist. Step developers will almost certainly operate within HGI.
 \npar For the most part, step development will take place outside of Mercury, and will consist of writing the step description (in whatever language is deemed appropriate for that purpose) and specifying the appropriate container to run the step. However, the step creator will need to interact with the system to:
@@ -283,6 +347,7 @@ seq 1 1000000 | filterPrimes | head -n 5
 \item Register a new step with the system.
 \end{itemize}
 \npar The step developer may also need a means to test a step before `officially' registering it with the system. This may take the form of a tool which runs a step in isolation, so that it can be tested manually on the command line without connecting it to a wider pipeline.
+
 \subsubsection{Pipeline Creator}
 \npar Pipeline creators are responsible for developing new pipelines (specifically, \glspl{abstract pipeline}) from existing steps or creating new versions of existing pipelines. Initially, pipeline authors are likely to be working within or closely with HGI; however, we would ideally like to enable faculty groups to develop their own pipelines. Pipeline developers will need to:
 \begin{itemize}
@@ -296,6 +361,7 @@ seq 1 1000000 | filterPrimes | head -n 5
 \npar With regard to the second issue of handling test-generated results, we have three main choices. One is to allow for a `test mode' which would let pipelines be modified and suppress the caching of results. Pipelines in test mode could not be published, and results from test mode runs would be discarded. This has the advantage of keeping everything under test tidily away from running pipelines. However, this prevents partial results from test pipelines being shared with each other, and also means that the `successful' iteration will need to be run twice - once in testing, and another after being published. This is sub-optimal. Also, there will undoubtedly come a time where somebody relies upon results generated in test mode, which we will not have the relevant backing provenance for.
 \npar The second approach is similar to that used in git and other version control systems. In this approach, every pipeline has a unique identity as a function of its components and architecture. When a test pipeline is run, this is run as a full pipeline and results generated are subject to tracking and caching as usual. However, at some point a pipeline can also be tagged with a `friendly' name. This is effectively the publication of a pipeline; only tagged pipelines appear in the catalogue, and untagged pipelines are only visible (on request) to their creators. Under the covers, however, results can still be shared between them and tagged pipelines.
 \npar The final approach, and one which may work either in conjunction with either of the two preceding approaches or on its own, is to have a separate test instance in which testing takes place before publishing a complete pipeline to the live system. This means that testing can be done at a lower priority than other activities, is guaranteed not to interfere with them, and can be done from a completely fresh start each time (by purging the test system every so often). This offers the best situation in terms of isolating testing, but potentially does not allow pipeline creators to exercise every possible scenario that would be faced in the real system.
+
 \subsubsection{Pipeline Runner}
 \npar The pipeline runner will be running existing pipelines, either on their own behalf or on behalf of another user. In the latter case, the pipeline runner will probably be within HGI, but in the former case the user may be from any faculty group. Whilst running a pipeline is the defining operation for this role, they will need to perform a number of distinct actions within the system:
 \begin{itemize}
@@ -317,8 +383,10 @@ seq 1 1000000 | filterPrimes | head -n 5
 \npar Determining provenance information becomes a little tricky when taking into account the aggressive optimisations discussed in section \ref{sec:optimisation}. For a given output, there may be multiple paths by which that output has been, or could have been, created. To compound matters, none of these may necessarily correspond to any way that a particular user has requested to have them created. In particular, the `actual' method by which the results were generated may have been a composite of a number of pipelines run at a number of times.
 \npar Clearly, there is no direct answer to this, since ultimately all of these routes are equally valid. The question of what to show to a user, then, is principally one of context. In this light, if a user requests information about how an output was generated in the context of a pipeline, we should show the provenance as if generated completely by that pipeline. If provenance is requested on data outside of this context, then we should show all possible ways by which the data could have been generated (most likely by showing where subsections of pipelines are equivalent, rather than showing all possible combinations), potentially sorted by measures such as which user ran the surrounding pipelines for particular sections, how recently this was done, which version of software was involved etc.
 \npar One of the core requirements for interactions covered under this role is that they are well-designed and easy to use. The pipeline runner will have the most frequent interaction with Merury, if not the most in-depth. The interface for pipeline runners is thus one of the most critical. It should be easy to run a pipeline through Mercury without specific programming knowledge through a simple interface (whether web-based, thick-client GUI or command line).
+
 \subsection{System Interactions}
 \npar The system interactions for Mercury cannot be so easily defined as its interactions with users, since in most cases the systems with which it could be expected to interact have themselves not been written or specified. Below we list the major systems we can see interacting with Mercury. However, the main point to make in this respect is that we should expose anything we envision users accessing to other systems as well.
+
 \subsubsection{Project-management system}
 \label{sec:interactions:ldap}
 \npar The key external interaction from an HGI perspective concerns the concept of a `project'. This is the key organisational unit for human genetics concerns, and governs much of how the system should operate. We would like to generalise this somewhat to allow Mercury to be used elsewhere, so for the purposes of Mercury we shall say that a project:
@@ -337,14 +405,26 @@ seq 1 1000000 | filterPrimes | head -n 5
 \item Determine relative resource allocations among all projects.
 \item Determine the current budget available to a project.
 \end{itemize}
+
 \subsubsection{External monitoring and logging systems}
 \npar Whilst Mercury is designed to be resilient and adaptable to problems in running pipelines, it relies upon the underlying components remaining up and stable. Where these fail, this falls outside the responsibility of Mercury to recover from, and we might wish to allow another system to watch the output and restart Mercury when it falls over.
 \npar Likewise, whilst the metadata system should capture all the relevant data to enable Mercury's goals, we might wish to capture more data for debugging or fault-recovery purposes. To this end, Mercury could support exposing raw events and system state to an external system, which could both act as a fully system log (potentially capable of regenerating the metadata system after a catastrophic failure) and as a system monitor, restarting key services if they fall over.
+
 \subsubsection{Input/Output steps}
 \npar The majority of external interactions performed by Mercury will be performed by Input/Output steps within pipelines themselves. This is therefore only relevant in that we do want to control the amount of access to external systems which can be performed by a step (external access being something we cannot control, and thus in particular cannot guarantee or replicate). We may therefore have specific system support to allow certain steps to access external resources. Steps that do not have this specific support could be barred by the container from accessing anything not local to the machine.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Functional Components
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \section{Functional Components}
 \npar The aim of this section is to describe, hopefully without descending too far into design, the basic functional pieces that we would expect to see in an embodiment of the Mercury system. It is not an attempt to partition the system into components which must be independent, or to be an architectural diagram.
 \npar Having said that, figure \ref{fig:architecture} gives a system diagram for a \textit{rough} idea of how we envision the parts below fitting together.
+
+%%%%%%%%%%%%%%%%%%%%
+% Architecture figure 
+%%%%%%%%%%%%%%%%%%%%
 \begin{figure}
 \tikzstyle{store}=[fill=red!20, text width=5em, 
     text centered, minimum height=2.5em, rounded corners]
@@ -389,29 +469,32 @@ seq 1 1000000 | filterPrimes | head -n 5
 		(res0) edge (heap)
 		(res2) edge (heap) 
 		(heap) -| (sysco);
-	\node (container) [below=2cm of mds] [container] {
+	\node[container,below=2cm of mds] (container) {
 		\begin{tikzpicture}
 			\node (cLabel){Container};
-			\node (xAgent) [below right=0.2cm and -0.75cm of cLabel] [process] {Execution Agent};
+			\node[process,below right=0.2cm and -0.75cm of cLabel] (xAgent) {Execution Agent};
 		\end{tikzpicture}
 	};
 	\node (hostAgent) [process,anchor=north east] at (sysco.east |- container.north) {Host Agent};
-	\draw [->] (jobX) |- (hostAgent)
-		  [<->] (hostAgent |- sysco.south) -- (hostAgent)
-		  [<->] (hostAgent) -- (container.east |- hostAgent)
-		  [<->] (hostAgent) |- (xAgent)
-		  [<->] (xAgent) -- (heap.east |- xAgent)
-		  [<->] (container) -- (heap.east |- container);
+	\draw [->] (jobX) |- (hostAgent.east);
+	\draw [<->] (hostAgent |- sysco.south) -- (hostAgent);
+	\draw [<->] (hostAgent) -- (container.east |- hostAgent);
+	\draw [<->] (hostAgent.south) |- (xAgent.east);
+%	\draw [<->] (xAgent.west) -- (heap.east |- xAgent);
+	\draw [<->] (container) -- (heap.east |- container);
 \end{tikzpicture}
 \caption{A rough system diagram for the proposed Mercury system.}
 \label{fig:architecture}
 \end{figure}
+
 \subsection{Main Queue}
 \npar The `main queue' is a loose term covering the part of the system which takes in a \gls{configured pipeline} and results in a sequence of jobs assigned to specific machines. In figure \ref{fig:architecture} and in the following sections, we have divided this into four main responsibilities. These responsibilities are even less cleanly divided than the other components mentioned in this section; they may split this way, or they may all be part of a single integrated component, or split some other way.
+
 \subsubsection{Pipeline Pool}
 \npar The pipeline pool is the entry point for a configured pipeline into the system. The pipeline pool keeps track of all pipelines which have been submitted into the system and have not completed, been cancelled, or otherwise been removed from the pool. This includes pipelines which are simply queued and have had no action taken, pipelines which have been compiled and have steps in the package pool, and pipelines with jobs currently running.
 \npar The pipeline pool \textit{may} choose to implement some sort of prioritisation system governing which pipelines go forward to the pipeline compiler. In many cases, where the number of pipelines is small, it may be likely that all pooled pipelines are submitted to the compiler for partial compilation.
 \npar The pipeline pool should provide an interface for querying the status information of pooled pipelines, as well as carrying out actions such as cancelling or pausing them. 
+
 \subsubsection{Pipeline Compiler}
 \label{sec:pipelineCompiler}
 \npar The pipeline compiler is responsible for taking a \gls{configured pipeline} and compiling it into an \gls{executable pipeline}.
@@ -422,9 +505,11 @@ seq 1 1000000 | filterPrimes | head -n 5
 \npar Each package bundle is submitted to the bundle pool for consideration. Since there may be multiple independent parts of a pipeline which may be executed at once, the compiler returns multiple package bundles, each one relating to a part of the pipeline.
 \npar When a job completes, the pipeline compiler needs to continue compilation with the continuation state of the associated package. The continuation state captures the choices which have been made in the selected package. For example, where a decision to parallelise over 5 jobs is made, the next step may also have to work in those same five parts. The compiler may choose to use the continuation state in whichever way it wants; it is not required to continue directly from the same position. An alternative to using continuation state would be to re-evaluate the compilation from the relevant step in the configured pipeline, discovering any already carried-out work in the same way as any other existing data.
 \npar The details of a pipeline compiler are likely to be quite complex. In appendix \ref{app:localCompiler} we give a sketch of the \textit{single pass local compiler}, a fairly basic compiler which works by doing a single expansion pass as it goes through the pipeline.
+
 \subsubsection{Bundle Pool}
 \npar The bundle pool holds the various bundles generated by the pipeline compiler. Since choosing a package from a bundle implies fixing an execution strategy, and is dependent on the state of the system, we want to keep bundles around for as long as possible. As such, we should keep the bundle around until a package is selected for execution.
 \npar The bundle pool need not apply any form of prioritisation, since this will be covered by the package pool.
+
 \subsubsection{Package Selector}
 \npar The package selector is responsible for choosing a package from each bundle in the bundle pool, according to a strategy selected by the user. This is done by estimating the costings for the resource demand based upon the current resource prices held in the system co-ordinator.
 \npar For example, if a particular job is assigned a fixed budget and a strategy which looks to execute the pipeline as fast as possible, the package selector would attempt to pick the package with lowest estimated time to completion which came in under the fixed budget. A strategy that called for executing as cheaply as possible would simply pick the package which has lowest cost according to the current \gls{resource} costings.
@@ -437,13 +522,15 @@ seq 1 1000000 | filterPrimes | head -n 5
 \end{enumerate}
 \npar The selected package from each bundle should be placed in the package pool. However, the package selector may subsequently change its mind and select a new package to submit in place of the current one, should resource costings change. This is valid until any jobs from the submitted package begin execution. It \textit{may} be valid after, although this typically would require killing the previous jobs and abandoning the results.
 \npar Typically, only one package may be selected from each bundle, although this is not a strict requirement; it should be valid to select multiple packages, for example to test which is faster, although this should come at a higher cost.
+
 \subsubsection{Package Pool}
 \npar The package pool consists of two elements. The first contains all packages submitted by the bundle selector. The steps contained in these packages are then expanded into the second component, the job pool. The job pool is similar to the job queue in more traditional schedulers. We do not call it such since it does not really behave as a queue - as mentioned, we expect jobs to be removed from it before scheduling if the bundle selector changes its mind about how it wants to divide the jobs, and there is certainly no idea that the first thing to be scheduled is the first to run.
 \npar We \textit{do} expect there to be some form of prioritisation to be applied when it comes to scheduling jobs, but this is more likely to be based upon resource offers (made by the job scheduler) and auctions for those resources among the jobs in the job pool.
 \npar Once one job from a package has begun, we expect all jobs from that package to run, and so the package becomes `locked in', and the bundle may be removed from the bundle pool. Alternatively, we could leave the bundle in to allow the package selector to choose to kill existing jobs, or just those which have not started running, in order to submit a different package. In particular, if we stop any new jobs from that package being run whilst leaving current jobs running, we may evaluate the cost of a putative replacement package incorporating any advantages from its inclusion of those already running jobs.
+
 \subsubsection{Job Scheduler}
 \npar The job scheduler receives resource availability notifications (in our imagined deployment model, from Mesos) and is responsible for allocation of these resources to job(s) in the job pool. In other words, the job scheduler is actually responsible for assigning a step to a host (and memory amount, I/O bandwidth etc) to use for execution.
-\npar The 
+
 \subsection{Heap Manager}
 \npar Mercury will, in our ideal conceptualisation, have control of large amounts of storage space, potentially across multiple systems and of many different types. This space will be held on behalf of other groups: a portion of their own space given up for the running of Mercury's pipelines. For reasons which will be made clear, we shall call the sum of all storage under the exclusive control of Mercury for pipeline execution the managed heap.
 \npar The heap is the space used for storage of any and all intermediate results generated by pipelines. As new data is being generated by pipelines, the heap will rapidly fill, and so we need ways of managing this. The conventional solution has been to manually remove data as it becomes unnecessary. However, this is both overly demanding of manpower and suboptimal - we do not want to remove data until the space is needed for something else, and where we do remove things we would like to first remove big things that can be generated easily (see section \ref{sec:optimisation} for discussion on calculating the relative costs of storage and compute). This problem has largely been solved already in the programming language world with garbage collection systems, which are responsible for freeing up data as and when necessary by determining which objects can still be referenced by the current system and which can be safely deleted.
@@ -452,12 +539,15 @@ seq 1 1000000 | filterPrimes | head -n 5
 \npar Thought must be given as to how useful group quotas are within a managed heap as we describe. Clearly, where space is available, it makes sense for a pipeline to use it, regardless of whether that space is technically owned by another group. When it comes to deleting things, we would like to first reclaim things which are cheap to regenerate, which may not accord with who owns them. We could integrate some measure of weighting of deletion priority according to who has an interest in specific datasets and their own priorities - for example, if we let $ A_g $ be the allocation accorded to group $ g $, and $ U_g $ be the current usage of group $ g $, then for a dataset $ \mathcal{S} $ which has been created/accessed by groups $ G(\mathcal{S}) $, we might add a priority multiplier of \[ \prod_{g \in G(\mathcal{S})} \frac{A_g}{U_g + 1}. \]
 Ideally, this would serve to try to keep usage in line with relative quota allocation, whilst also aiming to keep the easily re-creatable files. We would need to experiment to determine how much weight to give to this quota-based metric and to the recreation based one in order to achieve optimal usage.
 \npar One area in which quota limits would need to behave like hard limits is with regard to data referenced by future steps of currently running pipelines - e.g. data which is not eligible to be considered by the garbage collector. In this case, where there is a conflict between pipelines running under one group and under another in terms of space usage, and it is not practical or possible to reclaim space to allow both to succeed, priority must be given to pipelines operating under-quota.
+
 \subsection{Pipeline Catalogue}
 \npar The pipeline catalogue records all pipelines available for use within the Mercury system, and links a pipeline id (as used within the metadata system) to the specific pipeline specification to which it corresponds. The pipeline catalogue should also record the various extraneous user-supplied information about a pipeline, such as assertions (see section \ref{sec:generalisedAssertions}) and hints about the runtime profile (see section \ref{sec:optimisation}).
 \npar Since the pipeline catalogue is responsible for tying an internal pipeline id to a specific pipeline (or step), it is a necessary component in the provenance and repeatability goals; once added to the pipeline catalogue, a pipeline should never be removed or altered. This same restriction applies to any assertions or hints registered about pipelines, since they may be used in altering how a pipeline runs, and as such must be repeatable. In this sense, the pipeline catalogue shares some behaviour with the metadata system. However, whilst the metadata system will be continually updated as pipelines run, the catalogue remains fairly static at most times, until a new pipeline or assertion is added. It should be possible to mark a pipeline (or step) as deprecated, which would serve the purpose of suggesting that this pipeline or step should not generally be used (but may still be available to repeat previous analyses).
 \npar The pipeline catalogue serves a secondary purpose in exposing the list of available pipelines for the user to select from to run or include in a new pipeline. It may, for this purpose, also store extra information about a pipeline which would be useful to a user. For example, a description of the pipeline or a suggested use case.
+
 \subsubsection{Step Catalogue}
 \npar Included here as a subset of the pipeline catalogue, the Step Catalogue should retain a list of all (primitive) steps out of which one can build pipelines. As with the pipeline catalogue, there should be facilities to register a step, to obtain a list of all steps in the system, and to get details on an individual step. If the step has an implicit concept of `version' then this should be recognised by the step catalogue; otherwise, the catalogue should attempt to present the concept of a version over the top of the discrete primitive steps (by, e.g., grouping samtools-* steps together).
+
 \subsection{System Co-ordinator}
 \npar The system co-ordinator is responsible for overseeing and tracking the interaction of other components and the current system state. Where the metadata system (\ref{sec:metadataSystem}) is the long-term memory of the system, the system co-ordinator is the short-term memory and central nervous system.
 \npar The system co-ordinator has the following responsibilities:
@@ -471,6 +561,7 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \item Facilitating conversation between different parts of the system.
 \end{itemize}
 \npar Whilst the metadata system must be resilient to damage since it holds the canonical record of all previously run jobs, it should be assumed that if the system co-ordinator crashes, the only things that should fail should be currently executing jobs or pipelines. Any `complete' data which will continue to be useful to the system should be recorded in the metadata system. The system co-ordinator should still be resilient to breakage, since an outage would render it impossible to run jobs, but it should be valid to start a completely new system co-ordinator against an old metadata system and have the system come up correctly.
+
 \subsection{Metadata System}
 \label{sec:metadataSystem}
 \npar The metadata system holds the core register of everything that has been seen, done and output by the Mercury system. At a basic level, the metadata system is responsible for tracking:
@@ -483,6 +574,7 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \end{itemize}
 \npar The above list defines a minimal set of information needed to implement much of the above functionality. There are various other data which it might be useful for the metadata system to store - for example, a full log of everything done by the system.
 \npar The metadata system provides the majority of the checks and guarantees underlying the PRIOS capabilities of the system; as such, it must be highly resilient to outages, and deal with them in a predictable manner.
+
 \subsection{Host Agent}
 \npar The host agent is the principal representation of Mercury on a task execution host. As such, it is responsible for the following:
 \begin{itemize}
@@ -497,12 +589,14 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \npar Since the execution agent inside the container, and the container itself, have limited connectivity, most communications from the host to the wider system should be mediated through the host agent. The host agent should therefore be suitably scalable as to deal with multiple jobs running on the same host talking to it.
 \npar Since the host agent runs outside of a containerised environment, its role in actually executing the job should be minimal; the host agent is not responsible for running a step itself, but only for running up an execution agent within a suitable container.
 \npar Unlike the execution agent, the host agent is assumed to be fully under the control of the Mercury system; as such, it should be responsible for verifying the integrity of the container and execution agent. This prevents problems with execution agents being updated without increasing a version number or similar, or the container being corrupted or manipulated in some way.
+
 \subsection{Container}
 \npar The container provides the principal means of isolation and repeatability for a single job (as opposed to a pipeline, where repeatability is provided by the wider system guarantees).
 \npar The container provides the reproducible unit (e.g. the level of granularity at which things can be perfectly reproduced) for a given step. As such, the container must be persistent: immutable once created and stored for future usage. We would also like capsules to be minimal, such as to reduce the number of dependencies and sources for potential errors. However, this is not a requirement; we might have larger containers which can execute multiple steps.
 \npar A container is required to provide every requirement for executing one (or more) steps. For example, if a step describing an invocation of samtools-0.1.0 uses the container $ A $, then $ A $ is required to make available that specific version of samtools. It is also responsible for presenting any input data to the step running inside; the container should provide part of the implementation of the abstraction layer existing over the disparate resources. For example, resources stored in arbitrary places within the Mercury heap should be mounted into specific locations inside the container, such that the heap abstraction is obscured.
 \npar The container must also supply the execution agent (see \ref{sec:executionAgent}), which serves to interpret the step specification and maintain communication with the host agent about its status. Since the execution agent may perform non-trivial computation (in some cases, where the step specification itself describes the full computation, the entire step may be run within the execution agent), a specific version of the execution agent must be considered part of the container itself. This way, new versions of the execution agent may be created without breaking or altering the execution of previous pipelines.
 \npar Containers should provide some means for debugging the processes which are going on inside them. In our initial conception, which uses LXC as a container, an obvious route would be a flag that will run an SSH server inside the container, allowing somebody external to step inside the container and debug.
+
 \subsection{Execution agent}
 \label{sec:executionAgent}
 \npar The execution agent is the second of two agents which run on the execution host. Unlike the host agent, which runs outside of the container, the execution agent runs inside a container and is responsible for interpreting, and running, a step.
@@ -510,6 +604,7 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \npar The execution agent should keep hold of the file and process handles for any `exec'-ed processes it invokes, and (with reference to the step specification) use these to update the host agent (and through that, the system co-ordinator and metadata system) as to the job's status. For example, if a program emits a progress bar on stdout, the execution agent could parse this and use it to report on job progress. The execution agent should be able to distinguish success and failure exits from any invoked processes.
 \npar The execution agent, as opposed to the host agent, is responsible only for a single job, and its failure should be assumed; where an execution agent fails, this should be caught by the host and potentially restarted (on the same or another host).
 \npar Whilst we talk here about a single execution agent, we envision that there may be multiple execution agents supporting different programming environments. For example, a simple execution agent might interpret a bash script as a job, but we may also have execution agents that allow steps to be written in other programming languages such as Java, Haskell or Python. The important thing is that the execution agent have defined semantics for talking to the host agent and heap manager. Since step specifications require a particular execution agent, part of the step specification can be specific to that execution agent - for example, it may be a program in the given language.
+
 \subsection{Step Specification}
 \label{sec:stepSpec}
 \npar The step specification is the embodiment of a task that can be run on a given computer within the Mercury system. More formally, we shall say that the step specification is a program to be interpreted by an execution agent, along with a technical description of various of its properties.
@@ -533,10 +628,19 @@ Ideally, this would serve to try to keep usage in line with relative quota alloc
 \item A means of ascertaining the progress of this particular step.
 \end{itemize}
 \npar As mentioned, the program part of the step specification could potentially be written in multiple languages, provided there exists a suitable execution agent capable of interpreting the specification. The step id is likely to be generated as some kind of checksum of the above information, since this provides a guarantee that the step cannot be modified without changing the id.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Appendix
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{appendices}
-\section{The single pass local compiler}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The single-pass local compiler
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{The single-pass local compiler}
 \label{app:localCompiler}
-\npar In this appendix, we present a potential compilation model called single pass local compilation. This is named because it carries out a single pass through the pipeline, expanding as it goes and refusing to backtrack, and because it compiles the bundles for each step independently of the rest of the pipeline or any other pipelines.
+\npar In this appendix, we present a potential workflow compilation model called single pass local compilation. This is named because it carries out a single pass through the pipeline, expanding as it goes and refusing to backtrack, and because it compiles the bundles for each step independently of the rest of the pipeline or any other pipelines.
 \npar In spite of these drawbacks, local compilation still lets us do a great deal of potential optimisation on the pipeline, incorporating reuse of previous results (both stored and otherwise), knowledge of the cluster resource availability, and our models of likely execution time.
 \npar The relevant state (see \ref{sec:pipelineCompiler}) in this compilation model is the set of current node pointers (e.g. the nodes which are currently executing, or need to be executed next) in the configured graph, and the partially executable pipeline corresponding to each currently executing node. This latter shall be explained in more detail as we go along; to start the pipeline, we set the current node pointers to the input nodes (e.g. nodes which have no inputs connected to the output of another node), and the partially executable pipeline associated with each node to be empty.
 \npar The execution then proceeds as such: we first attempt, in the forward pass, to use our history of previous jobs to determine whether we can skip any steps forward by re-using previous results. We then, in the backward pass, work out whether we have any stored results associated with these previous runs. This gives us a set of starting points. We then calculate the cost for starting the pipeline from each of these points, take a subset of these, and submit them to the bundle pool.
@@ -550,6 +654,7 @@ data State = State Pipeline [(NodePointer, FlatTree)]
 \end{lstlisting}
 \npar A Tree captures one `level' of depth in the exploration of a single branch of a pipeline. It contains the pipeline at that depth , the set of node pointers at that depth, and a set of expansions, each corresponding to one of the node pointers. The expansion can be `None' (if at a primitive node), may contain a single subtree (if at a composite node) or a bundle of subtrees (at a parallel node). This definition is clearly recursive, terminating where all `Expansion's are `None'.
 \npar A `FlatTree' represents a tree in which all expansions are `None' - e.g. all steps are primitive. The `State' captures the top-level pipeline, where each current node pointer has been fully expanded. This is what we mean by `single-pass' - once an expansion has been decided upon by a previous compilation, that fully-expanded plan is committed to until it returns to the top-level pipeline.
+
 \paragraph{Forward pass}
 The forward pass goes forward through the graph, and attempts to work out where we can use the results of previous pipelines to short-cut the computation.
 \begin{enumerate}
@@ -566,6 +671,7 @@ The forward pass goes forward through the graph, and attempts to work out where 
 \item If, by moving the pointer forward, we reach the output(s) of a subgraph, then the pointer should move upward to the relevant output(s) in the surrounding graph, and exploration continue from there.
 \item We should now have a single `Tree', where each node pointer is associated with an expansion into a subtree or bundle of subtrees.
 \end{enumerate}
+
 \paragraph{Backward pass}
 The backward pass starts from the tree identified in the previous pass. It then walks backwards through the graph from the deepest NodePointers on each branch to determine the latest point for which we have data stored.
 \begin{enumerate}
@@ -588,6 +694,7 @@ This has the effect of `pushing` the bundling structure to the top of the tree. 
 \item Finally, since our state only allows `FlatTree's, we need to collapse each tree in the bundle into a `FlatTree'. This is fairly simple, and is just achieved by `inlining' every tree into its parent pipeline. This simplifies the state (e.g. we are just carrying a single pipeline around) at the cost of being committed, for the remainder of the execution of a step in the top-level graph, to the execution plan decided upon when that step was first encountered.
 \item We now need to cost each tree in each bundle (in terms of resource usage), in order to give the user (or the user's agent) enough information to decide on an execution plan. We do this using the data stored in the metadata system concerning previous invocations of the same or similar commands as those in our pipelines (on similar data). We evaluate both the expected cost of the current steps (e.g. those which will go on to become jobs) and (with some lower accuracy) the expected cost of the rest of the pipeline (again, based on similar pipelines and data).
 \end{enumerate}
+
 \subsection{Expansion of parallel steps}
 \label{sec:expansionOfParallelSteps}
 \npar Where we have parallel steps, there are multiple possible ways to expand them (e.g. multiple choices for the parallelisation parameters), and we wish to decide upon a sensible number of these as candidates for execution.
@@ -596,8 +703,15 @@ This has the effect of `pushing` the bundling structure to the top of the tree. 
 \item Firstly, use the current and historic system load to generate a sensible range of values and add these.
 \item Then, look in the metadata system for and previous invocations of parallel steps on the same input data and sharing the same (primitive) head nodes. Add the parameters which were used to run these previous steps.
 \end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Acknowledgements
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section*{Acknowledgements}
 Many thanks to Tommy Carstenessen for his comments from a user perspective in trying to define the user interfaces, and to Irina Colgiu for other assorted comments.
+
 \end{appendices}
+
 \printglossaries
+
 \end{document}
