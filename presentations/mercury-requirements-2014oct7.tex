@@ -90,6 +90,9 @@
 \addtobeamertemplate{background}{\box\@backgroundblock}{}
 \makeatother
 
+% setup shadedbox environment as an mdframed box with partial opacity
+\usepackage[framemethod=tikz]{mdframed}
+\newmdenv[tikzsetting={draw=none,fill=black,fill opacity=0.5},backgroundcolor=none]{shadedbox}
 
 \begin{document}
 
@@ -100,7 +103,6 @@
 \section*{\scshape Introduction}
 \begin{frame}
 \title{Mercury Requirements}
-\subtitle{Bioinformatics Analysis Pipelines Day}
 \author{
 	Joshua C. Randall \\
 	{\it 
@@ -112,7 +114,7 @@
 	% HGI logo is covered under the license for this work
 	\scalebox{0.5}{\includegraphics{images/HGI-ltblue}} \\
 	\vspace{0.5cm}
-	24th July 2014
+	7th October 2014
 }
 \titlepage
 \end{frame}
@@ -137,7 +139,9 @@
 
 \begin{frame}{Introduction}
 \pipesbackground
+\begin{shadedbox}
 \tableofcontents
+\end{shadedbox}
 \end{frame}
 
 
@@ -146,11 +150,11 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{\scshape Background}
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{What is a pipeline?}
 \begin{frame}{What is a pipeline?}
 \pipesbackground
+\begin{shadedbox}
 \begin{itemize}
 \item Recipe for producing data products from input data
 \item Series of steps to be run in order
@@ -158,24 +162,28 @@
 \item Can be run on different datasets to yield comparable results
 \item In other fields this is often called a ``workflow''
 \end{itemize}
+\end{shadedbox}
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Pipeline system interfaces}
 \begin{frame}{Pipeline system interfaces}
 \pipesbackground
+\begin{shadedbox}
 \begin{itemize}
 \item Push vs Pull
 \item Imperative vs Declarative
 \item Procedural/RO vs Functional/RT
 \item Inherently distributed or not 
 \end{itemize}
+\end{shadedbox}
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{Pipeline systems in use today}
 \begin{frame}{Pipeline systems in use today}
 \pipesbackground
+\begin{shadedbox}
 \begin{itemize}
 \item Shell scripts
 \item Make
@@ -186,6 +194,7 @@
 \item GATK/Queue
 \item eHive
 \end{itemize}
+\end{shadedbox}
 \end{frame}
 
 
@@ -278,7 +287,8 @@ external dependencies
 \item Executables
 \item System libraries
 \item Environment variables
-\item Yields referential transparency 
+\item Yields referential \\
+transparency 
 \end{itemize}
 \item Repeatability and Isolation \\
 together enable portability 
@@ -289,7 +299,7 @@ together enable portability
 \subsection{Optimisation}
 \begin{frame}{workflow Optimisation}
 \begin{backgroundblock}{0cm}{0cm}
-		\vbox to \paperheight{\vfil\hbox to \paperwidth{\hskip 6cm 
+		\vbox to \paperheight{\vfil\hbox to \paperwidth{\hskip 6.5cm 
 		\begin{overpic}[height=0.85\paperheight]{images/Cliff_nostri-imago_-_Control_Room_-_cc-by-2_0_-_flickr}
 		% Image source: https://www.flickr.com/photos/nostri-imago/2860446049/
 		\put(39,0.5){\textcolor{gray}{\fontsize{4}{6}\selectfont Photo: Cliffords Photography}}
