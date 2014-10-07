@@ -1,8 +1,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Mercury Requirements
-% 20 minute talk for Bioinformatics Analysis Pipelines Day
+% Short (5m) Talk
 % Wellcome Trust Sanger Institute
-% 24th July 2014
+% 7th October 2014
 % Joshua C. Randall
 % 
 % This work is licensed under the Creative Commons Attribution-ShareAlike 4.0 
@@ -95,108 +95,6 @@
 \newmdenv[tikzsetting={draw=none,fill=black,fill opacity=0.5},backgroundcolor=none]{shadedbox}
 
 \begin{document}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Introduction
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section*{\scshape Introduction}
-\begin{frame}
-\title{Mercury Requirements}
-\author{
-	Joshua C. Randall \\
-	{\it 
-	Human Genetics Informatics \\
-	Wellcome Trust Sanger Institute 
-	}\\
-}
-\date{
-	% HGI logo is covered under the license for this work
-	\scalebox{0.5}{\includegraphics{images/HGI-ltblue}} \\
-	\vspace{0.5cm}
-	7th October 2014
-}
-\titlepage
-\end{frame}
-
-% HGI logo in bottom left corner of remaining frames
-\addtobeamertemplate{background}{\vbox to0pt{\vskip 8.9cm \hbox to0pt{\hskip 1mm \relax
-	% HGI logo is covered under the license for this work
-	\includegraphics[height=0.6cm]{images/HGI-ltblue}
-}}}
-
-% pipework background image
-\newcommand{\pipesbackground}{
-	\begin{backgroundblock}{0cm}{0cm}
-		\vbox to \paperheight{\vfil\hbox to \paperwidth{\hfil
-		\begin{overpic}[height=0.85\paperheight]{images/Jano_De_Cesare_-_Pipelines_-_by-nc-nd-2_0_-_flickr}
-		% Image source: https://www.flickr.com/photos/janodecesare/3020406104/
-		\put(88,0.5){\textcolor{gray}{\fontsize{4}{6}\selectfont Photo: Jano De Cesare}}
-		\end{overpic}
-		\hfil\hskip 2mm}\vfil}
-	\end{backgroundblock}
-}
-
-\begin{frame}{Introduction}
-\pipesbackground
-\begin{shadedbox}
-\tableofcontents
-\end{shadedbox}
-\end{frame}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Background
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{\scshape Background}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{What is a pipeline?}
-\begin{frame}{What is a pipeline?}
-\pipesbackground
-\begin{shadedbox}
-\begin{itemize}
-\item Recipe for producing data products from input data
-\item Series of steps to be run in order
-\item Represents analysis ``Best practices''
-\item Can be run on different datasets to yield comparable results
-\item In other fields this is often called a ``workflow''
-\end{itemize}
-\end{shadedbox}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Pipeline system interfaces}
-\begin{frame}{Pipeline system interfaces}
-\pipesbackground
-\begin{shadedbox}
-\begin{itemize}
-\item Push vs Pull
-\item Imperative vs Declarative
-\item Procedural/RO vs Functional/RT
-\item Inherently distributed or not 
-\end{itemize}
-\end{shadedbox}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Pipeline systems in use today}
-\begin{frame}{Pipeline systems in use today}
-\pipesbackground
-\begin{shadedbox}
-\begin{itemize}
-\item Shell scripts
-\item Make
-\item LSF
-\item Runner.pm
-\item Other ad-hoc LSF wrappers
-\item VRPipe
-\item GATK/Queue
-\item eHive
-\end{itemize}
-\end{shadedbox}
-\end{frame}
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Requirements
@@ -349,93 +247,6 @@ external data corruption
 \end{itemize}
 \end{frame}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{Other Goals}
-\begin{frame}{Other Goals}
-\begin{backgroundblock}{0cm}{0cm}
-		\vbox to \paperheight{\vfil\hbox to \paperwidth{\hskip 6.8cm 
-		\begin{overpic}[height=0.85\paperheight]{images/Antonio_Martinez_-_Goal_-_cc-by-sa-2_0_-_flickr_cropped}
-		% Image source: https://www.flickr.com/photos/poper/163163341/
-		\put(49,0.5){\textcolor{gray}{\fontsize{4}{6}\selectfont Photo: Antonio Martinez}}
-		\end{overpic}
-		\hfil\hskip 2mm}\vfil}
-\end{backgroundblock}
-\begin{itemize}
-
-\item Flexibility 
-\begin{itemize}
-\item minimal external \\
-dependencies
-\item stable interface to \\
-primitive steps
-\end{itemize}
-
-\item Scalability
-\begin{itemize}
-\item within a cluster
-\item into the cloud
-\item federation?
-\end{itemize}
-
-\item Usability
-\begin{itemize}
-\item easy to design pipelines
-\item easy to run pipelines
-\item composable and shareable
-\item deployable system
-\item debuggable
-\end{itemize}
-\end{itemize}
-\end{frame}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Design
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{\scshape Design}
-\subsection{User roles}
-\begin{frame}{User roles}
-\begin{backgroundblock}{0cm}{0cm}
-		\vbox to \paperheight{\vfil\hbox to \paperwidth{\hskip 7cm 
-		\includegraphics[height=0.85\paperheight]{images/yunguyen666_-_Rolls_Royce_-_cc-by-2_0_-_flickr}
-		% Image source: https://www.flickr.com/photos/12716052@N04/3896880606/
-		% Attribution watermark already included in image
-		\hfil\hskip 2mm}\vfil}
-\end{backgroundblock}
-\begin{itemize}
-\item Mercury administrator
-\item Step creator
-\item Pipeline creator
-\item Pipeline runner
-\end{itemize}
-\end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{System diagram}
-\setbeamercolor*{background canvas}{bg=white}
-\setbeamercolor{normal text}{fg=black, bg=white} 
-\setbeamercolor*{example text}{fg=black} 
-\setbeamercolor*{structure}{fg=sangerdarkblue} 
-\begin{frame}{System \\
-diagram}
-\begin{backgroundblock}{0cm}{0cm}
-		\vbox to \paperheight{\vfil\hbox to \paperwidth{\hskip 3cm 
-		% Mercury system diagram is covered under the license for this work
-		\includegraphics[height=0.85\paperheight]{images/mercury-system-diagram}
-		\hfil\hskip 2mm}\vfil}
-\end{backgroundblock}
-\end{frame}
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Questions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section*{\scshape Questions}
-\setbeamercolor*{background canvas}{bg=black}
-\setbeamercolor{normal text}{fg=white, bg=black} 
-\setbeamercolor*{structure}{fg=sangermidblue} 
-\begin{frame}{Questions?}
-\end{frame}
 
 
 \end{document}
