@@ -240,6 +240,7 @@
 \section{\scshape The farm}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection*{The farm}
 \begin{frame}{The farm}
 \dcbackground
 \shadedbackground{0.5}{1}
@@ -343,10 +344,17 @@
 \begin{shadedbox}
 \begin{itemize}
 \item LSF scheduler doesn't optimise resource utilisation very well
-\item Multiple isolated clusters that can't share resource
+\item Multiple isolated hardware clusters that can't share resource between them
 	\begin{itemize}
-	\item farm3, vr-farm, cgp-farm, 
+	\item farm3 (LSF)
+	\item vr-farm (LSF)
+	\item cgp2 (LSF)
+	\item pcs4 (LSF)
+	\item seq-farm (LSF)
+	\item hgs4 (Mesos)
+	\item humgen-01 (Arvados Crunch/Keep)
 	\end{itemize}
+\item Large storage silos encourage duplication (to bring data closer to compute)
 \end{itemize}
 \end{shadedbox}
 \end{frame}
@@ -476,6 +484,21 @@
 \end{itemize}
 \end{frame}
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection*{What can OpenStack do?}
+\begin{frame}{What can OpenStack do?}
+\cloudsbackground
+%\shadedbackground{0.25}{1}
+\begin{itemize}
+\item Run any x86 OS on physical hardware (whole nodes only)
+\item Run any x86 OS on virtual compute instances (choosing from a set of predefined sizes)
+\item Provide virtual block storage devices for ``local'' volumes
+\item Provide object-storage for data
+\item Connect compute instances to each other and to the outside world through configurable networking (including basic firewall configuration)
+\end{itemize}
+\end{frame}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection*{When will OpenStack be available?}
 \begin{frame}{When will OpenStack be available?}
@@ -493,6 +516,7 @@
 \item SciaaS production OpenStack system expected to be available in early 2017
 \end{itemize}
 \end{frame}
+
 
 \darkcolors
 
